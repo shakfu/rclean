@@ -12,6 +12,14 @@ struct Args {
     /// Path to begin cleaning
     #[arg(short, long, default_value_os = ".")]
     path: String,
+
+    // /// Add start_swith patterns
+    // #[arg(short, long)]
+    // spattern: Vec<String>,
+
+    // /// Add ends_with patterns
+    // #[arg(short, long)]
+    // epattern: Vec<String>
 }
 
 fn remove(entry: walkdir::DirEntry) {
