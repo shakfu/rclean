@@ -2,6 +2,17 @@
 
 use std::fs;
 use walkdir::WalkDir;
+use clap::Parser;
+
+
+/// Program to cleanup non-essential files or directories
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Path to begin cleaning
+    #[arg(short, long, default_value_os = ".")]
+    path: String,
+}
 
 fn remove(entry: walkdir::DirEntry) {
     let p = entry.path();
@@ -13,7 +24,7 @@ fn remove(entry: walkdir::DirEntry) {
     }
 }
 
-fn main() -> std::io::Result<()> {
+fn cleanup(root: &std::path::Path) ->  std::io::Result<()> {
 
     let startswith_patterns  = vec![
         // directory
@@ -41,7 +52,7 @@ fn main() -> std::io::Result<()> {
 
     let mut counter = 0;
 
-    for entry in WalkDir::new(".").into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(root).into_iter().filter_map(|e| e.ok()) {
         for pattern in &startswith_patterns {
             if entry.file_name().to_str().map_or(false, |s| s.starts_with(pattern)) {
                 counter += 1;
@@ -59,4 +70,11 @@ fn main() -> std::io::Result<()> {
 
     println!("Deleted {} items of detritus", counter);
     Ok(())
+}
+
+fn main() {
+    let args = Args::parse();
+    // println!("path: '{}'", args.path);
+    let path = std::path::Path::new(&args.path);
+    cleanup(&path);
 }
