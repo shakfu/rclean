@@ -3,6 +3,9 @@
 use clap::Parser;
 use std::fs;
 use walkdir::WalkDir;
+use log::{info, debug, warn, error, trace};
+use simplelog::*;
+use logging_timer::{time, stime};
 
 // --------------------------------------------------------------------
 // cli
@@ -11,16 +14,14 @@ use walkdir::WalkDir;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Path to begin cleaning
+    // Path to begin cleaning
     #[arg(short, long, default_value_os = ".")]
     path: String,
-    // /// Add start_swith patterns
-    // #[arg(short, long)]
-    // spattern: Vec<String>,
 
-    // /// Add ends_with patterns
+    // glob options
+    // #[arg(short, long, default_value_os = ".pyc")]
     // #[arg(short, long)]
-    // epattern: Vec<String>
+    // glob: String,
 }
 
 // --------------------------------------------------------------------
@@ -72,6 +73,7 @@ fn is_removable(entry: walkdir::DirEntry) -> bool {
 // --------------------------------------------------------------------
 // cleaning functions
 
+#[time("info")]
 fn cleanup(root: &std::path::Path) -> std::io::Result<()> {
     let mut size = 0;
     let mut counter = 0;
@@ -84,7 +86,7 @@ fn cleanup(root: &std::path::Path) -> std::io::Result<()> {
         }
     }
 
-    println!(
+    info!(
         "Deleted {} item(s) totalling {:.2} MB",
         counter,
         (size as f64) / 1000000.
@@ -95,9 +97,27 @@ fn cleanup(root: &std::path::Path) -> std::io::Result<()> {
 // --------------------------------------------------------------------
 // main function
 
+
 fn main() {
+    let config = ConfigBuilder::new()
+        .set_level_color(Level::Info, Some(Color::Green))
+        .set_level_color(Level::Trace, Some(Color::Magenta))
+        .build();
+
+    TermLogger::init(
+        LevelFilter::Trace,
+        config,
+        TerminalMode::Mixed,
+        ColorChoice::Auto
+    );
     let args = Args::parse();
-    // println!("path: '{}'", args.path);
+    // debug!("path: '{}'", args.path);
+    // debug!("glob: '{}'", args.glob);
     let path = std::path::Path::new(&args.path);
     cleanup(&path);
+    // info!("Commencing yak shaving for {:?}", "hello");
+    // debug!("this for dev eyes only {:?}", "debug");    
+    // error!("not good {:?}", "bad");
+    // warn!("nice but be {:?}", "careful");
+    // trace!("find it please {:?}", "traced");
 }
