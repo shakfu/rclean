@@ -3,6 +3,7 @@
 use clap::Parser;
 use std::fs;
 use walkdir::WalkDir;
+use glob::glob;
 use log::{info, debug, warn, error, trace};
 use simplelog::*;
 use logging_timer::{time, stime};
@@ -19,9 +20,8 @@ struct Args {
     path: String,
 
     // glob options
-    // #[arg(short, long, default_value_os = ".pyc")]
-    // #[arg(short, long)]
-    // glob: String,
+    #[arg(short, long)]
+    glob: String,
 }
 
 // --------------------------------------------------------------------
@@ -77,7 +77,6 @@ fn is_removable(entry: walkdir::DirEntry) -> bool {
 fn cleanup(root: &std::path::Path) -> std::io::Result<()> {
     let mut size = 0;
     let mut counter = 0;
-
     for entry in WalkDir::new(root).into_iter().filter_map(|e| e.ok()) {
         if is_removable(entry.clone()) {
             size += entry.path().metadata()?.len();
@@ -93,6 +92,17 @@ fn cleanup(root: &std::path::Path) -> std::io::Result<()> {
     );
     Ok(())
 }
+
+#[time("info")]
+fn glob_cleanup(glob_pattern: std::string::String) {
+    for entry in glob(&glob_pattern).expect("Failed to read glob pattern") {
+        match entry {
+            Ok(path) => println!("{:?}", path.display()),
+            Err(e) => println!("{:?}", e),
+        }
+    }
+}
+
 
 // --------------------------------------------------------------------
 // main function
@@ -113,11 +123,10 @@ fn main() {
     let args = Args::parse();
     // debug!("path: '{}'", args.path);
     // debug!("glob: '{}'", args.glob);
-    let path = std::path::Path::new(&args.path);
-    cleanup(&path);
-    // info!("Commencing yak shaving for {:?}", "hello");
-    // debug!("this for dev eyes only {:?}", "debug");    
-    // error!("not good {:?}", "bad");
-    // warn!("nice but be {:?}", "careful");
-    // trace!("find it please {:?}", "traced");
+    if (args.glob != "") {
+        glob_cleanup(args.glob);  
+    } else {
+        let path = std::path::Path::new(&args.path);
+        cleanup(&path);    
+    }
 }
