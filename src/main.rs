@@ -3,13 +3,13 @@
 use clap::Parser;
 use dialoguer::Confirm;
 use glob::glob;
-use indicatif::ProgressBar;
 use log::{debug, error, info, trace, warn};
 use logging_timer::{stime, time};
 use simplelog::*;
 use std::fs;
 use std::path::PathBuf;
 use walkdir::WalkDir;
+
 
 // --------------------------------------------------------------------
 // cli
@@ -25,20 +25,14 @@ struct Args {
     // glob options
     #[arg(short, long, help = "use glob patterns")]
     glob: Option<String>,
-
-    // progressbar
-    #[arg(short = 'b', long = "progressbar", help = "use progressbar")]
-    progressbar: bool,
 }
 
 // --------------------------------------------------------------------
 // remove functions
 
-fn remove_direntry(entry: walkdir::DirEntry, display: bool) {
+fn remove_direntry(entry: walkdir::DirEntry) {
     let p = entry.path();
-    if (display) {
-        println!("Deleting {}", p.display());
-    }
+    println!("Deleting {}", p.display());
     if entry.metadata().unwrap().is_file() {
         fs::remove_file(p);
     } else {
@@ -99,7 +93,7 @@ fn cleanup(root: &std::path::Path) -> std::io::Result<()> {
         if is_removable(entry.clone()) {
             size += entry.path().metadata()?.len();
             counter += 1;
-            remove_direntry(entry.clone(), false);
+            remove_direntry(entry.clone());
         }
     }
 
@@ -108,21 +102,6 @@ fn cleanup(root: &std::path::Path) -> std::io::Result<()> {
         counter,
         (size as f64) / 1000000.
     );
-    Ok(())
-}
-
-fn cleanup_progressbar(root: &std::path::Path) -> std::io::Result<()> {
-    let mut xs: Vec<walkdir::DirEntry> = Vec::new();
-    for entry in WalkDir::new(root).into_iter().filter_map(|e| e.ok()) {
-        if is_removable(entry.clone()) {
-            xs.push(entry.clone());
-        }
-    }
-    let pb = ProgressBar::new(xs.len() as u64);
-    for x in xs {
-        remove_direntry(x, true);
-        pb.inc(1);
-    }
     Ok(())
 }
 
@@ -171,15 +150,9 @@ fn main() {
     );
     let args = Args::parse();
     if (args.glob.is_some()) {
-        match args.progressbar {
-            true => println!("run progressbar"),
-            false => glob_cleanup(args.glob.unwrap()),
-        };
+        glob_cleanup(args.glob.unwrap());
     } else {
         let path = std::path::Path::new(&args.path);
-        match args.progressbar {
-            true => cleanup_progressbar(&path),
-            false => cleanup(&path),
-        };
+        cleanup(&path);
     }
 }
