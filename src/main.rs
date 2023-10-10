@@ -4,9 +4,13 @@ use clap::Parser;
 use std::fs;
 use walkdir::WalkDir;
 use glob::glob;
+use dialoguer::Confirm;
 use log::{info, debug, warn, error, trace};
 use simplelog::*;
 use logging_timer::{time, stime};
+
+// use std::string::String;
+use std::path::PathBuf;
 
 // --------------------------------------------------------------------
 // cli
@@ -20,20 +24,29 @@ struct Args {
     path: String,
 
     // glob options
-    #[arg(short, long)]
+    #[arg(short, long, required=false)]
     glob: String,
 }
 
 // --------------------------------------------------------------------
 // remove functions
 
-fn remove(entry: walkdir::DirEntry) {
+fn remove_direntry(entry: walkdir::DirEntry) {
     let p = entry.path();
     println!("Deleting {}", p.display());
     if entry.metadata().unwrap().is_file() {
         fs::remove_file(p);
     } else {
         fs::remove_dir_all(p);
+    }
+}
+
+fn remove_pathbuf(entry: PathBuf) {
+    println!("Deleting {}", entry.display());
+    if entry.metadata().unwrap().is_file() {
+        fs::remove_file(entry);
+    } else {
+        fs::remove_dir_all(entry);
     }
 }
 
@@ -81,7 +94,7 @@ fn cleanup(root: &std::path::Path) -> std::io::Result<()> {
         if is_removable(entry.clone()) {
             size += entry.path().metadata()?.len();
             counter += 1;
-            remove(entry.clone());
+            remove_direntry(entry.clone());
         }
     }
 
@@ -95,11 +108,29 @@ fn cleanup(root: &std::path::Path) -> std::io::Result<()> {
 
 #[time("info")]
 fn glob_cleanup(glob_pattern: std::string::String) {
+    let mut xs:Vec<PathBuf> = Vec::new();
+    let mut process = |e: PathBuf| { 
+        println!("{:?}", e.display());
+        xs.push(e);
+    };
     for entry in glob(&glob_pattern).expect("Failed to read glob pattern") {
         match entry {
-            Ok(path) => println!("{:?}", path.display()),
+            Ok(ref path) => process(entry.unwrap()),
             Err(e) => println!("{:?}", e),
         }
+    }
+    let confirmation = Confirm::new()
+        .with_prompt("Do you want to delete the above?")
+        .interact()
+        .unwrap();
+
+    if confirmation {
+        println!("Looks like you want to continue");
+        for name in xs.iter() {
+            println!("deleting {:?}", name);
+        }
+    } else {
+        println!("nevermind then.");
     }
 }
 
