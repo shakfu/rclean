@@ -2,15 +2,13 @@
 
 use clap::Parser;
 use std::fs;
+use std::path::PathBuf;
 use walkdir::WalkDir;
 use glob::glob;
 use dialoguer::Confirm;
 use log::{info, debug, warn, error, trace};
 use simplelog::*;
 use logging_timer::{time, stime};
-
-// use std::string::String;
-use std::path::PathBuf;
 
 // --------------------------------------------------------------------
 // cli
@@ -24,8 +22,8 @@ struct Args {
     path: String,
 
     // glob options
-    #[arg(short, long, required=false)]
-    glob: String,
+    #[arg(short, long)]
+    glob: Option<String>,
 }
 
 // --------------------------------------------------------------------
@@ -154,8 +152,8 @@ fn main() {
     let args = Args::parse();
     // debug!("path: '{}'", args.path);
     // debug!("glob: '{}'", args.glob);
-    if (args.glob != "") {
-        glob_cleanup(args.glob);  
+    if (args.glob.is_some()) {
+        glob_cleanup(args.glob.unwrap());  
     } else {
         let path = std::path::Path::new(&args.path);
         cleanup(&path);    
