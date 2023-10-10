@@ -1,14 +1,15 @@
 #![allow(unused)]
 
 use clap::Parser;
+use dialoguer::Confirm;
+use glob::glob;
+use indicatif::ProgressBar;
+use log::{debug, error, info, trace, warn};
+use logging_timer::{stime, time};
+use simplelog::*;
 use std::fs;
 use std::path::PathBuf;
 use walkdir::WalkDir;
-use glob::glob;
-use dialoguer::Confirm;
-use log::{info, debug, warn, error, trace};
-use simplelog::*;
-use logging_timer::{time, stime};
 
 // --------------------------------------------------------------------
 // cli
@@ -18,20 +19,26 @@ use logging_timer::{time, stime};
 #[command(author, version, about, long_about = None)]
 struct Args {
     // Path to begin cleaning
-    #[arg(short, long, default_value_os = ".")]
+    #[arg(short, long, default_value_os = ".", help = "path for default cleanup")]
     path: String,
 
     // glob options
-    #[arg(short, long)]
+    #[arg(short, long, help = "use glob patterns")]
     glob: Option<String>,
+
+    // progressbar
+    #[arg(short = 'b', long = "progressbar", help = "use progressbar")]
+    progressbar: bool,
 }
 
 // --------------------------------------------------------------------
 // remove functions
 
-fn remove_direntry(entry: walkdir::DirEntry) {
+fn remove_direntry(entry: walkdir::DirEntry, display: bool) {
     let p = entry.path();
-    println!("Deleting {}", p.display());
+    if (display) {
+        println!("Deleting {}", p.display());
+    }
     if entry.metadata().unwrap().is_file() {
         fs::remove_file(p);
     } else {
@@ -92,7 +99,7 @@ fn cleanup(root: &std::path::Path) -> std::io::Result<()> {
         if is_removable(entry.clone()) {
             size += entry.path().metadata()?.len();
             counter += 1;
-            remove_direntry(entry.clone());
+            remove_direntry(entry.clone(), false);
         }
     }
 
@@ -104,10 +111,25 @@ fn cleanup(root: &std::path::Path) -> std::io::Result<()> {
     Ok(())
 }
 
+fn cleanup_progressbar(root: &std::path::Path) -> std::io::Result<()> {
+    let mut xs: Vec<walkdir::DirEntry> = Vec::new();
+    for entry in WalkDir::new(root).into_iter().filter_map(|e| e.ok()) {
+        if is_removable(entry.clone()) {
+            xs.push(entry.clone());
+        }
+    }
+    let pb = ProgressBar::new(xs.len() as u64);
+    for x in xs {
+        remove_direntry(x, true);
+        pb.inc(1);
+    }
+    Ok(())
+}
+
 #[time("info")]
 fn glob_cleanup(glob_pattern: std::string::String) {
-    let mut xs:Vec<PathBuf> = Vec::new();
-    let mut process = |e: PathBuf| { 
+    let mut xs: Vec<PathBuf> = Vec::new();
+    let mut process = |e: PathBuf| {
         println!("{:?}", e.display());
         xs.push(e);
     };
@@ -132,10 +154,8 @@ fn glob_cleanup(glob_pattern: std::string::String) {
     }
 }
 
-
 // --------------------------------------------------------------------
 // main function
-
 
 fn main() {
     let config = ConfigBuilder::new()
@@ -147,15 +167,19 @@ fn main() {
         LevelFilter::Trace,
         config,
         TerminalMode::Mixed,
-        ColorChoice::Auto
+        ColorChoice::Auto,
     );
     let args = Args::parse();
-    // debug!("path: '{}'", args.path);
-    // debug!("glob: '{}'", args.glob);
     if (args.glob.is_some()) {
-        glob_cleanup(args.glob.unwrap());  
+        match args.progressbar {
+            true => println!("run progressbar"),
+            false => glob_cleanup(args.glob.unwrap()),
+        };
     } else {
         let path = std::path::Path::new(&args.path);
-        cleanup(&path);    
+        match args.progressbar {
+            true => cleanup_progressbar(&path),
+            false => cleanup(&path),
+        };
     }
 }

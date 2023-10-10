@@ -9,6 +9,7 @@ edition = "2021"
 clap = { version = "4.3.19", features = ["derive"] }
 dialoguer = "0.11.0"
 glob = "0.3.1"
+indicatif = "0.17.7"
 log = "0.4.20"
 logging_timer = "1.1.0"
 simplelog = "0.12.1"
