@@ -10,7 +10,6 @@ use std::fs;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
-
 // --------------------------------------------------------------------
 // cli
 
@@ -27,12 +26,15 @@ struct Args {
     glob: Option<String>,
 }
 
-#[derive()]
-struct Job<'a>  {
+// --------------------------------------------------------------------
+// structures > DefaultJob
+
+struct DefaultJob<'a> {
     root: &'a std::path::Path,
     patterns: Vec<&'a str>,
 }
 
+impl DefaultJob<'_>{
     #[time("info")]
     fn cleanup(&self) -> std::io::Result<()> {
         let mut size = 0;
@@ -44,7 +46,7 @@ struct Job<'a>  {
                 self.remove_direntry(entry.clone());
             }
         }
-    
+
         info!(
             "Deleted {} item(s) totalling {:.2} MB",
             counter,
@@ -75,15 +77,10 @@ struct Job<'a>  {
         }
         return false;
     }
-
 }
-
-
 
 // --------------------------------------------------------------------
 // remove functions
-
-
 
 fn remove_pathbuf(entry: PathBuf) {
     println!("Deleting {}", entry.display());
@@ -94,11 +91,8 @@ fn remove_pathbuf(entry: PathBuf) {
     }
 }
 
-
-
 // --------------------------------------------------------------------
 // cleaning functions
-
 
 #[time("info")]
 fn glob_cleanup(glob_pattern: String) {
@@ -147,24 +141,23 @@ fn main() {
     if (args.glob.is_some()) {
         glob_cleanup(args.glob.unwrap());
     } else {
-        let job = Job {
+        let job = DefaultJob {
             root: std::path::Path::new(&args.path),
-            patterns:  vec![
-                    // directory
-                    ".coverage",
-                    ".DS_Store",
-                    // ".egg-info",
-                    ".mypy_cache/",
-                    ".pylint_cache",
-                    ".ruff_cache",
-                    "__pycache__",
-                    // file
-                    ".bash_history",
-                    ".log",
-                    ".pyc",
-                    ".python_history",
-                    "pip-log.txt",
-                ]
+            patterns: vec![
+                // directory
+                ".coverage",
+                ".DS_Store",
+                ".mypy_cache/",
+                ".pylint_cache",
+                ".ruff_cache",
+                "__pycache__",
+                // file
+                ".bash_history",
+                ".log",
+                ".pyc",
+                ".python_history",
+                "pip-log.txt",
+            ],
         };
         job.cleanup();
     }

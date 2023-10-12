@@ -71,10 +71,10 @@ fn is_removable(entry: walkdir::DirEntry) -> bool {
     ];
 
     for pattern in &endswith_patterns {
-        if entry
+        if (entry
             .file_name()
             .to_str()
-            .map_or(false, |s| s.ends_with(pattern))
+            .map_or(false, |s| s.ends_with(pattern)))
         {
             return true;
         }
