@@ -153,7 +153,7 @@ fn main() {
                     // directory
                     ".coverage",
                     ".DS_Store",
-                    ".egg-info",
+                    // ".egg-info",
                     ".mypy_cache/",
                     ".pylint_cache",
                     ".ruff_cache",
