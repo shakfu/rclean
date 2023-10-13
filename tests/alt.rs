@@ -75,7 +75,7 @@ impl DefaultJob<'_>{
                 return true;
             }
         }
-        return false;
+        false
     }
 }
 

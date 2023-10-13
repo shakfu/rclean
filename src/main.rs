@@ -13,49 +13,57 @@ use walkdir::WalkDir;
 // --------------------------------------------------------------------
 // constants
 
-const PATTERNS: [&'static str;11] = [
+const PATTERNS: [&str; 16] = [
     // directory
+    ".cache",
     ".coverage",
     ".DS_Store",
-    ".mypy_cache/",
+    ".mypy_cache",
     ".pylint_cache",
+    ".pytest_cache",
     ".ruff_cache",
     "__pycache__",
+    "DerivedData",
     // file
     ".bash_history",
     ".log",
+    ".o",
+    ".dSYM",
     ".pyc",
     ".python_history",
     "pip-log.txt",
 ];
 
-
 // --------------------------------------------------------------------
-// cli
+// cli options
 
 /// Program to cleanup non-essential files or directories
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    // Path to begin cleaning
-    #[arg(short, long, default_value_os = ".", help = "path for default cleanup")]
+    /// Path to begin default cleaning
+    #[arg(short, long, default_value_os = ".")]
     path: String,
 
-    // glob options
-    #[arg(short, long, help = "use glob patterns")]
+    /// Dry-run without actual removal
+    #[arg(short, long)]
+    dry_run: bool,
+
+    /// Glob-based removal
+    #[arg(short, long)]
     glob: Option<String>,
 }
 
 // --------------------------------------------------------------------
-// structures > DefaultJob
+// structures
 
-struct DefaultJob {
+#[derive(Debug, Clone, Default)]
+struct CleanupJob {
     root: String,
-    patterns: [&'static str;11],
+    patterns: [&'static str; 16],
 }
 
-impl DefaultJob{
-
+impl CleanupJob {
     fn new(path: String) -> Self {
         Self {
             root: path,
@@ -64,7 +72,7 @@ impl DefaultJob{
     }
 
     #[time("info")]
-    fn cleanup(&self) -> std::io::Result<()> {
+    fn cleanup(&self, dry_run: bool) -> std::io::Result<()> {
         let path = std::path::Path::new(&self.root);
         let mut size = 0;
         let mut counter = 0;
@@ -72,7 +80,11 @@ impl DefaultJob{
             if self.is_removable(entry.clone()) {
                 size += entry.path().metadata()?.len();
                 counter += 1;
-                self.remove_direntry(entry.clone());
+                if dry_run {
+                    println!("{:?}", entry);
+                } else {
+                    self.remove(entry.clone());
+                }
             }
         }
 
@@ -84,7 +96,7 @@ impl DefaultJob{
         Ok(())
     }
 
-    fn remove_direntry(&self, entry: walkdir::DirEntry) {
+    fn remove(&self, entry: walkdir::DirEntry) {
         let p = entry.path();
         println!("Deleting {}", p.display());
         if entry.metadata().unwrap().is_file() {
@@ -104,7 +116,7 @@ impl DefaultJob{
                 return true;
             }
         }
-        return false;
+        false
     }
 }
 
@@ -170,7 +182,8 @@ fn main() {
     if (args.glob.is_some()) {
         glob_cleanup(args.glob.unwrap());
     } else {
-        let job = DefaultJob::new(args.path);
-        job.cleanup();
+        let job = CleanupJob::new(args.path);
+        info!("{:?}", job);
+        job.cleanup(args.dry_run);
     }
 }
