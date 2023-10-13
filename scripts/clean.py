@@ -194,10 +194,10 @@ class Cleaner(object):
     def clean_endings(self, path):
         """convert windows endings to unix endings
         """
-        with file(path) as old:
+        with open(path) as old:
             lines = old.readlines()
         string = "".join(l.rstrip()+'\n' for l in lines)
-        with file(path, 'w') as new:
+        with open(path, 'w') as new:
             new.write(string)
 
     @classmethod

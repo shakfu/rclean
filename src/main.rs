@@ -10,32 +10,9 @@ use std::fs;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
-// --------------------------------------------------------------------
-// constants
-
-const PATTERNS: [&str; 16] = [
-    // directory
-    ".cache",
-    ".coverage",
-    ".DS_Store",
-    ".mypy_cache",
-    ".pylint_cache",
-    ".pytest_cache",
-    ".ruff_cache",
-    "__pycache__",
-    "DerivedData",
-    // file
-    ".bash_history",
-    ".log",
-    ".o",
-    ".dSYM",
-    ".pyc",
-    ".python_history",
-    "pip-log.txt",
-];
 
 // --------------------------------------------------------------------
-// cli options
+// cli
 
 /// Program to cleanup non-essential files or directories
 #[derive(Parser, Debug)]
@@ -55,75 +32,19 @@ struct Args {
 }
 
 // --------------------------------------------------------------------
-// structures
-
-#[derive(Debug, Clone, Default)]
-struct CleanupJob {
-    root: String,
-    patterns: [&'static str; 16],
-}
-
-impl CleanupJob {
-    fn new(path: String) -> Self {
-        Self {
-            root: path,
-            patterns: PATTERNS,
-        }
-    }
-
-    #[time("info")]
-    fn cleanup(&self, dry_run: bool) -> std::io::Result<()> {
-        let path = std::path::Path::new(&self.root);
-        let mut size = 0;
-        let mut counter = 0;
-        for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
-            if self.is_removable(entry.clone()) {
-                size += entry.path().metadata()?.len();
-                counter += 1;
-                if dry_run {
-                    println!("{:?}", entry);
-                } else {
-                    self.remove(entry.clone());
-                }
-            }
-        }
-
-        info!(
-            "Deleted {} item(s) totalling {:.2} MB",
-            counter,
-            (size as f64) / 1000000.
-        );
-        Ok(())
-    }
-
-    fn remove(&self, entry: walkdir::DirEntry) {
-        let p = entry.path();
-        println!("Deleting {}", p.display());
-        if entry.metadata().unwrap().is_file() {
-            fs::remove_file(p);
-        } else {
-            fs::remove_dir_all(p);
-        }
-    }
-
-    fn is_removable(&self, entry: walkdir::DirEntry) -> bool {
-        for pattern in &self.patterns {
-            if entry
-                .file_name()
-                .to_str()
-                .map_or(false, |s| s.ends_with(pattern))
-            {
-                return true;
-            }
-        }
-        false
-    }
-}
-
-// --------------------------------------------------------------------
 // remove functions
 
-fn remove_pathbuf(entry: PathBuf) {
+fn remove_direntry(entry: walkdir::DirEntry) {
+    let p = entry.path();
+    println!("Deleting {}", p.display());
+    if entry.metadata().unwrap().is_file() {
+        fs::remove_file(p);
+    } else {
+        fs::remove_dir_all(p);
+    }
+}
+
+fn remove_pathbuf(entry: &PathBuf) {
     println!("Deleting {}", entry.display());
     if entry.metadata().unwrap().is_file() {
         fs::remove_file(entry);
@@ -133,10 +54,66 @@ fn remove_pathbuf(entry: PathBuf) {
 }
 
 // --------------------------------------------------------------------
+// matching functions
+
+fn is_removable(entry: walkdir::DirEntry) -> bool {
+    let endswith_patterns = vec![
+        // directory
+        ".coverage",
+        ".DS_Store",
+        // ".egg-info",
+        ".mypy_cache/",
+        ".pylint_cache",
+        ".ruff_cache",
+        "__pycache__",
+        // file
+        ".bash_history",
+        ".log",
+        ".pyc",
+        ".python_history",
+        "pip-log.txt",
+    ];
+
+    for pattern in &endswith_patterns {
+        if (entry
+            .file_name()
+            .to_str()
+            .map_or(false, |s| s.ends_with(pattern)))
+        {
+            return true;
+        }
+    }
+    false
+}
+
+// --------------------------------------------------------------------
 // cleaning functions
 
 #[time("info")]
-fn glob_cleanup(glob_pattern: String) {
+fn cleanup(root: String, dry_run: bool) -> std::io::Result<()> {
+    let mut size = 0;
+    let mut counter = 0;
+    let path = std::path::Path::new(&root);
+    for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+        if is_removable(entry.clone()) {
+            size += entry.path().metadata()?.len();
+            counter += 1;
+            if !dry_run {
+                remove_direntry(entry.clone());
+            }
+        }
+    }
+
+    info!(
+        "Deleted {} item(s) totalling {:.2} MB",
+        counter,
+        (size as f64) / 1000000.
+    );
+    Ok(())
+}
+
+#[time("info")]
+fn glob_cleanup(glob_pattern: String, dry_run: bool) {
     let mut xs: Vec<PathBuf> = Vec::new();
     let mut process = |e: PathBuf| {
         println!("{:?}", e.display());
@@ -148,19 +125,27 @@ fn glob_cleanup(glob_pattern: String) {
             Err(e) => println!("{:?}", e),
         }
     }
-    let confirmation = Confirm::new()
+    if !xs.is_empty() {
+        let confirmation = Confirm::new()
         .with_prompt("Do you want to delete the above?")
         .interact()
         .unwrap();
 
-    if confirmation {
-        println!("Looks like you want to continue");
-        for name in xs.iter() {
-            println!("deleting {:?}", name);
+        if confirmation {
+            println!("Looks like you want to continue");
+            for name in xs.iter() {
+                println!("deleting {:?}", name);
+                if !dry_run {
+                    remove_pathbuf(name);
+                }
+            }
+        } else {
+            println!("nevermind then.");
         }
     } else {
-        println!("nevermind then.");
+        warn!("no matches found.");
     }
+
 }
 
 // --------------------------------------------------------------------
@@ -180,10 +165,11 @@ fn main() {
     );
     let args = Args::parse();
     if (args.glob.is_some()) {
-        glob_cleanup(args.glob.unwrap());
+        match args.glob {
+            Some(p) => glob_cleanup(p, args.dry_run),
+            None => eprintln!("glob pattern not found"),
+        };
     } else {
-        let job = CleanupJob::new(args.path);
-        info!("{:?}", job);
-        job.cleanup(args.dry_run);
+        cleanup(args.path, args.dry_run);
     }
 }

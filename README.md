@@ -12,3 +12,6 @@ accomplish code cleanups. The intention is for the rust version to provide featu
     - see [remove_dir_all](https://crates.io/crates/remove_dir_all)
 
 
+## Links
+
+- [Vector of Actions](https://stackoverflow.com/questions/31736656/how-to-implement-a-vector-array-of-functions-in-rust-when-the-functions-co)
