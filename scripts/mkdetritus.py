@@ -4,10 +4,6 @@ import os
 import string
 from pathlib import Path
 
-def create_large_file(name, size=30):
-    with open(name,"wb") as f:
-        f.seek((2**size)-1)
-        f.write(b"\0")
 
 dirs = [
     ".cache",
@@ -39,22 +35,31 @@ bad_examples = [
     ".offline",
 ]
 
-for f in files:
-    p = Path(f)
-    p.touch()
+def create_large_file(name, size=30):
+    with open(name,"wb") as f:
+        f.seek((2**size)-1)
+        f.write(b"\0")
 
-# for i in bad_examples:
-#     p = Path(i)
-#     p.touch()
+def create_detritus(path: str):
+    path = Path(path)
 
-for e in file_endings:
-    for c in string.ascii_lowercase:
-        p = Path(f'{c}{e}')
+    for f in files:
+        p = Path(f)
         p.touch()
 
-for d in dirs:
-	os.mkdir(d)
+    for i in bad_examples:
+        p = Path(i)
+        p.touch()
 
-create_large_file("hello.log")
+    for e in file_endings:
+        for c in string.ascii_lowercase:
+            p = Path(f'{c}{e}')
+            p.touch()
 
+    for d in dirs:
+        os.mkdir(d)
 
+    create_large_file("hello.log")
+
+if __name__ == '__main__':
+    create_detritus('.')
