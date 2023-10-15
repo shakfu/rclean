@@ -2,7 +2,7 @@
 
 use clap::Parser;
 use dialoguer::Confirm;
-use glob::glob;
+use globset::{Glob, GlobSetBuilder};
 use log::{debug, error, info, trace, warn};
 use logging_timer::{stime, time};
 use simplelog::*;
@@ -13,24 +13,26 @@ use walkdir::WalkDir;
 
 // --------------------------------------------------------------------
 // constants
+
+/// list of glob patterns of files / directories to remove.
 const PATTERNS: [&str;14] = [
         // directory
-        ".coverage",
-        ".DS_Store",
+        "**/.coverage",
+        "**/.DS_Store",
         // ".egg-info",
-        ".cache",
-        ".mypy_cache",
-        ".pylint_cache",
-        ".pytest_cache",
-        ".ruff_cache",
-        "__pycache__",
+        "**/.cache",
+        "**/.mypy_cache",
+        "**/.pylint_cache",
+        "**/.pytest_cache",
+        "**/.ruff_cache",
+        "**/__pycache__",
         // file
-        ".bash_history",
-        ".log",
-        ".o",
-        ".pyc",
-        ".python_history",
-        "pip-log.txt",
+        "**/.bash_history",
+        "*.log",
+        "*.o",
+        "*.py[co]",
+        "**/.python_history",
+        "**/pip-log.txt",
     ];
  
 // --------------------------------------------------------------------
@@ -44,117 +46,74 @@ struct Args {
     #[arg(short, long, default_value_os = ".")]
     path: String,
 
+    /// Skip confirmation
+    #[arg(short='y', long)]
+    skip_confirmation: bool,
+
     /// Dry-run without actual removal
     #[arg(short, long)]
     dry_run: bool,
-
-    /// Glob-based removal
-    #[arg(short, long)]
-    glob: Option<String>,
 }
 
 // --------------------------------------------------------------------
-// model
+// core
 
-type Matcher<T> = fn(T) -> T;
-
-struct Job {
+struct CleaningJob {
     path: String,
     patterns: Vec<String>,
     dry_run: bool,
+    skip_confirmation: bool,
 }
 
-trait Cleaner<T> {
-    fn run(&self);
-    fn remove(&self, entry: T);
-    fn is_removable(&self, entry: T) -> bool;
-}
-
-impl Cleaner<walkdir::DirEntry> for Job {
+impl CleaningJob {
 
     #[time("info")]
     fn run(&self) {
+        let mut xs: Vec<walkdir::DirEntry> = Vec::new();
         let mut size = 0;
         let mut counter = 0;
+        let mut builder = GlobSetBuilder::new();
+        for pattern in self.patterns.iter() {
+            builder.add(Glob::new(pattern).unwrap());
+        }
+        let gset = builder.build().unwrap();
         let path = std::path::Path::new(&self.path);
         for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
-            if self.is_removable(entry.clone()) {
+            if gset.is_match(entry.path()) {
+                xs.push(entry.clone());
+                println!("Matched: {:?}", entry.path().display());
                 match entry.path().metadata() {
                     Ok(info) => size += info.len(),
                     Err(e) => eprintln!("metadata not found"),
                 }
                 counter += 1;
-                if !self.dry_run {
-                    self.remove(entry.clone());
-                }
             }
         }
-    
-        info!(
-            "Deleted {} item(s) totalling {:.2} MB",
-            counter,
-            (size as f64) / 1000000.
-        );
-    }
 
-    fn remove(&self, entry: walkdir::DirEntry) {
-        let p = entry.path();
-        println!("Deleting {}", p.display());
-        if entry.metadata().unwrap().is_file() {
-            fs::remove_file(p);
-        } else {
-            fs::remove_dir_all(p);
-        }
-    }
-
-    fn is_removable(&self, entry: walkdir::DirEntry) -> bool {
-        for pattern in &self.patterns {
-            if (entry
-                .file_name()
-                .to_str()
-                .map_or(false, |s| s.ends_with(pattern)))
-            {
-                return true;
-            }
-        }
-        false
-    }  
-}
-
-impl Cleaner<&PathBuf> for Job {
-
-    fn is_removable(&self, entry: &std::path::PathBuf) -> bool {
-        true
-    }
-
-    #[time("info")]
-    fn run(&self) {
-        let mut xs: Vec<PathBuf> = Vec::new();
-        let mut process = |e: PathBuf| {
-            println!("{:?}", e.display());
-            xs.push(e);
-        };
-        for pattern in &self.patterns {
-            for entry in glob(pattern).expect("Failed to read glob pattern") {
-                match entry {
-                    Ok(ref path) => process(entry.unwrap()),
-                    Err(e) => println!("{:?}", e),
-                }
-            }
-        }
         if !xs.is_empty() {
-            let confirmation = Confirm::new()
-            .with_prompt("Do you want to delete the above?")
-            .interact()
-            .unwrap();
+            let mut confirmation = false;
+            if self.skip_confirmation {
+                confirmation = true;
+            } else {
+                confirmation = Confirm::new()
+                .with_prompt("Do you want to delete the above?")
+                .interact()
+                .unwrap();
+            }
     
             if confirmation {
-                println!("Looks like you want to continue");
+                // println!("Looks like you want to continue");
                 for name in xs.iter() {
-                    println!("deleting {:?}", name);
                     if !self.dry_run {
                         self.remove(name);
                     }
+                }
+                if !self.dry_run {
+                    info!(
+                        "Deleted {} item(s) totalling {:.2} MB",
+                        counter,
+                        (size as f64) / 1000000.
+                    );    
                 }
             } else {
                 println!("nevermind then.");
@@ -162,14 +121,16 @@ impl Cleaner<&PathBuf> for Job {
         } else {
             warn!("no matches found.");
         }
+    
     }
 
-    fn remove(&self, entry: &PathBuf) {
-        println!("Deleting {}", entry.display());
+    fn remove(&self, entry: &walkdir::DirEntry) {
+        let p = entry.path();
+        // println!("Deleting {}", p.display());
         if entry.metadata().unwrap().is_file() {
-            fs::remove_file(entry);
+            fs::remove_file(p);
         } else {
-            fs::remove_dir_all(entry);
+            fs::remove_dir_all(p);
         }
     }
     
@@ -191,25 +152,15 @@ fn main() {
         ColorChoice::Auto,
     );
     let args = Args::parse();
-    if (args.glob.is_some()) {
-        let mut job = Job {
-            path: args.path,
-            patterns: vec![],
-            dry_run: args.dry_run,
-        };
-        job.patterns.push(args.glob.unwrap());
-        // job.run();
-        <Job as Cleaner<&PathBuf>>::run(&job);
-    } else {
-        let mut job = Job {
-            path: args.path,
-            patterns: vec![],
-            dry_run: args.dry_run,
-        };
-        for p in PATTERNS {
-            job.patterns.push(String::from(p));
-        }
-        // job.run();
-        <Job as Cleaner<walkdir::DirEntry>>::run(&job)
+    let mut job = CleaningJob {
+        path: args.path,
+        patterns: vec![],
+        dry_run: args.dry_run,
+        skip_confirmation: args.skip_confirmation,
+    };
+    for p in PATTERNS {
+        job.patterns.push(String::from(p));
     }
+    job.run();
+
 }
