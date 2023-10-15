@@ -6,8 +6,7 @@ use dialoguer::Confirm;
 use globset::{Glob, GlobSetBuilder};
 use log::{debug, error, info, trace, warn};
 use logging_timer::{stime, time};
-use simplelog::{Color, ColorChoice, 
-    ConfigBuilder, Level, LevelFilter, TermLogger, TerminalMode};
+use simplelog::{Color, ColorChoice, ConfigBuilder, Level, LevelFilter, TermLogger, TerminalMode};
 use std::fs;
 use std::path::PathBuf;
 use walkdir::WalkDir;
@@ -170,15 +169,15 @@ fn main() {
         if settings_file.exists() {
             info!("using settings file: {:?}", SETTINGS_FILENAME);
             let settings = Config::builder()
-            .add_source(config::File::with_name(settings_file.to_str().unwrap()))
-            .build()
-            .unwrap();
-    
+                .add_source(config::File::with_name(settings_file.to_str().unwrap()))
+                .build()
+                .unwrap();
+
             let path = settings.get_string("path").unwrap();
             let pattern_array = settings.get_array("patterns").unwrap();
             let dry_run = settings.get_bool("dry_run").unwrap();
             let skip_confirmation = settings.get_bool("skip_confirmation").unwrap();
-    
+
             let mut job = CleaningJob {
                 path,
                 patterns: vec![],
@@ -190,13 +189,16 @@ fn main() {
                     job.patterns.push(p.to_string());
                 }
             }
-            job.run();        
+            job.run();
+        } else {
+            error!("Error: configfile {:?} not found", SETTINGS_FILENAME);
+        }
     } else if args.list {
         info!("default patterns: {:?}", PATTERNS);
     } else {
         let mut job = CleaningJob {
             path: args.path,
-            patterns: args.glob.unwrap(),
+            patterns: args.glob.unwrap_or(vec![]),
             dry_run: args.dry_run,
             skip_confirmation: args.skip_confirmation,
         };
@@ -206,6 +208,5 @@ fn main() {
             }
         }
         job.run();
-    }
     }
 }
