@@ -42,7 +42,7 @@ const PATTERNS: [&str;14] = [
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Path to begin default cleaning
+    /// Working Directory
     #[arg(short, long, default_value_os = ".")]
     path: String,
 
@@ -53,6 +53,14 @@ struct Args {
     /// Dry-run without actual removal
     #[arg(short, long)]
     dry_run: bool,
+
+    /// Specify custom glob pattern(s)
+    #[arg(short, long)]
+    glob: Option<Vec<String>>,
+
+    /// list default glob patterns
+    #[arg(short, long)]
+    list: bool    
 }
 
 // --------------------------------------------------------------------
@@ -152,15 +160,21 @@ fn main() {
         ColorChoice::Auto,
     );
     let args = Args::parse();
-    let mut job = CleaningJob {
-        path: args.path,
-        patterns: vec![],
-        dry_run: args.dry_run,
-        skip_confirmation: args.skip_confirmation,
-    };
-    for p in PATTERNS {
-        job.patterns.push(String::from(p));
+    if args.list {
+        info!("default patterns: {:?}", PATTERNS);
+    } else {
+        let mut job = CleaningJob {
+            path: args.path,
+            // patterns: vec![],
+            patterns: args.glob.unwrap(),
+            dry_run: args.dry_run,
+            skip_confirmation: args.skip_confirmation,
+        };
+        if job.patterns.is_empty() {
+            for p in PATTERNS {
+                job.patterns.push(String::from(p));
+            }    
+        }
+        job.run();
     }
-    job.run();
-
 }
