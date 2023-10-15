@@ -1,0 +1,22 @@
+# rclean configuration
+path = "."
+patterns = [
+    # dirs
+    "**/.coverage",
+    "**/.DS_Store",
+    "**/.cache",
+    "**/.mypy_cache",
+    "**/.pylint_cache",
+    "**/.pytest_cache",
+    "**/.ruff_cache",
+    "**/__pycache__",
+    # files
+    "**/.bash_history",
+    "*.log",
+    "*.o",
+    "*.py[co]",
+    "**/.python_history",
+    "**/pip-log.txt",
+]
+dry_run = false
+skip_confirmation = false

@@ -7,9 +7,9 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.3.19", features = ["derive"] }
+config = "0.13.3"
 dialoguer = "0.11.0"
 globset = "0.4.13"
-indicatif = "0.17.7"
 log = "0.4.20"
 logging_timer = "1.1.0"
 simplelog = "0.12.1"

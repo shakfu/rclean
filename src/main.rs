@@ -1,40 +1,43 @@
 #![allow(unused)]
 
 use clap::Parser;
+use config::Config;
 use dialoguer::Confirm;
 use globset::{Glob, GlobSetBuilder};
 use log::{debug, error, info, trace, warn};
 use logging_timer::{stime, time};
-use simplelog::*;
+use simplelog::{Color, ColorChoice, 
+    ConfigBuilder, Level, LevelFilter, TermLogger, TerminalMode};
 use std::fs;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
-
 // --------------------------------------------------------------------
 // constants
 
+const SETTINGS_FILENAME: &str = "rclean_settings.toml";
+
 /// list of glob patterns of files / directories to remove.
-const PATTERNS: [&str;14] = [
-        // directory
-        "**/.coverage",
-        "**/.DS_Store",
-        // ".egg-info",
-        "**/.cache",
-        "**/.mypy_cache",
-        "**/.pylint_cache",
-        "**/.pytest_cache",
-        "**/.ruff_cache",
-        "**/__pycache__",
-        // file
-        "**/.bash_history",
-        "*.log",
-        "*.o",
-        "*.py[co]",
-        "**/.python_history",
-        "**/pip-log.txt",
-    ];
- 
+const PATTERNS: [&str; 14] = [
+    // directory
+    "**/.coverage",
+    "**/.DS_Store",
+    // ".egg-info",
+    "**/.cache",
+    "**/.mypy_cache",
+    "**/.pylint_cache",
+    "**/.pytest_cache",
+    "**/.ruff_cache",
+    "**/__pycache__",
+    // file
+    "**/.bash_history",
+    "*.log",
+    "*.o",
+    "*.py[co]",
+    "**/.python_history",
+    "**/pip-log.txt",
+];
+
 // --------------------------------------------------------------------
 // cli api
 
@@ -47,7 +50,7 @@ struct Args {
     path: String,
 
     /// Skip confirmation
-    #[arg(short='y', long)]
+    #[arg(short = 'y', long)]
     skip_confirmation: bool,
 
     /// Dry-run without actual removal
@@ -60,7 +63,11 @@ struct Args {
 
     /// list default glob patterns
     #[arg(short, long)]
-    list: bool    
+    list: bool,
+
+    /// Configure from settings file
+    #[arg(short, long)]
+    configfile: bool,
 }
 
 // --------------------------------------------------------------------
@@ -74,7 +81,6 @@ struct CleaningJob {
 }
 
 impl CleaningJob {
-
     #[time("info")]
     fn run(&self) {
         let mut xs: Vec<walkdir::DirEntry> = Vec::new();
@@ -104,11 +110,11 @@ impl CleaningJob {
                 confirmation = true;
             } else {
                 confirmation = Confirm::new()
-                .with_prompt("Do you want to delete the above?")
-                .interact()
-                .unwrap();
+                    .with_prompt("Do you want to delete the above?")
+                    .interact()
+                    .unwrap();
             }
-    
+
             if confirmation {
                 // println!("Looks like you want to continue");
                 for name in xs.iter() {
@@ -121,7 +127,7 @@ impl CleaningJob {
                         "Deleted {} item(s) totalling {:.2} MB",
                         counter,
                         (size as f64) / 1000000.
-                    );    
+                    );
                 }
             } else {
                 println!("nevermind then.");
@@ -129,7 +135,6 @@ impl CleaningJob {
         } else {
             warn!("no matches found.");
         }
-    
     }
 
     fn remove(&self, entry: &walkdir::DirEntry) {
@@ -141,31 +146,56 @@ impl CleaningJob {
             fs::remove_dir_all(p);
         }
     }
-    
 }
 
 // --------------------------------------------------------------------
 // main function
 
 fn main() {
-    let config = ConfigBuilder::new()
+    let logging_config = ConfigBuilder::new()
         .set_level_color(Level::Info, Some(Color::Green))
         .set_level_color(Level::Trace, Some(Color::Magenta))
         .build();
 
     TermLogger::init(
         LevelFilter::Trace,
-        config,
+        logging_config,
         TerminalMode::Mixed,
         ColorChoice::Auto,
     );
+
     let args = Args::parse();
-    if args.list {
+    if args.configfile {
+        let settings_file = std::path::Path::new(SETTINGS_FILENAME);
+        if settings_file.exists() {
+            info!("using settings file: {:?}", SETTINGS_FILENAME);
+            let settings = Config::builder()
+            .add_source(config::File::with_name(settings_file.to_str().unwrap()))
+            .build()
+            .unwrap();
+    
+            let path = settings.get_string("path").unwrap();
+            let pattern_array = settings.get_array("patterns").unwrap();
+            let dry_run = settings.get_bool("dry_run").unwrap();
+            let skip_confirmation = settings.get_bool("skip_confirmation").unwrap();
+    
+            let mut job = CleaningJob {
+                path,
+                patterns: vec![],
+                dry_run,
+                skip_confirmation,
+            };
+            if job.patterns.is_empty() {
+                for p in pattern_array {
+                    job.patterns.push(p.to_string());
+                }
+            }
+            job.run();        
+    } else if args.list {
         info!("default patterns: {:?}", PATTERNS);
     } else {
         let mut job = CleaningJob {
             path: args.path,
-            // patterns: vec![],
             patterns: args.glob.unwrap(),
             dry_run: args.dry_run,
             skip_confirmation: args.skip_confirmation,
@@ -173,8 +203,9 @@ fn main() {
         if job.patterns.is_empty() {
             for p in PATTERNS {
                 job.patterns.push(String::from(p));
-            }    
+            }
         }
         job.run();
+    }
     }
 }
