@@ -2,7 +2,36 @@
 #[cfg(test)]
 mod tests {
     use toml::Table;
+    use std::fs;
+    use serde::{Serialize, Deserialize};
 
+    const PATTERNS: [&str; 14] = [
+        // directory
+        "**/.coverage",
+        "**/.DS_Store",
+        // ".egg-info",
+        "**/.cache",
+        "**/.mypy_cache",
+        "**/.pylint_cache",
+        "**/.pytest_cache",
+        "**/.ruff_cache",
+        "**/__pycache__",
+        // file
+        "**/.bash_history",
+        "*.log",
+        "*.o",
+        "*.py[co]",
+        "**/.python_history",
+        "**/pip-log.txt",
+    ];
+
+    #[derive(Serialize, Deserialize)]
+    struct CleaningJob {
+        path: String,
+        patterns: Vec<String>,
+        dry_run: bool,
+        skip_confirmation: bool,
+    }
 
     #[test]
     fn test_toml_basic() {
@@ -20,34 +49,45 @@ mod tests {
         assert!(xs.iter().any(|e| e.contains("bar")));
         assert!(xs.iter().any(|e| e.contains("bat")));
     }
+
     #[test]
-    fn test_toml_table() {
-        let table = "\
-# rclean configuration
-path = '.'
-patterns = [
-    # dirs
-    '*/.coverage',
-    '*/.DS_Store',
-    '*/.cache',
-    '*/.mypy_cache',
-    '*/.pylint_cache',
-    '*/.pytest_cache',
-    '*/.ruff_cache',
-    '*/__pycache__',
-    # files
-    '*/.bash_history',
-    '.log',
-    '.o',
-    '.py[co]',
-    '*/.python_history',
-    '*/pip-log.txt',
-]
-dry_run = false
-skip_confirmation = false
-".parse::<Table>().unwrap();
+    fn test_toml_load() {
+        let contents = fs::read_to_string("tests/rclean_settings.toml")
+            .expect("cannot read file");
+        assert!(!contents.is_empty());
+    }
+
+    #[test]
+    fn test_toml_table_from_file() {
+        let contents = fs::read_to_string("tests/rclean_settings.toml")
+            .expect("cannot read file");
+        let table = contents.parse::<Table>().unwrap();
         assert_eq!(table["path"].as_str(), Some("."));
         //let array = table["patterns"].as_array();
         assert_eq!(table["dry_run"].as_bool(), Some(false));
     }
+
+    #[test]
+    fn test_toml_to_file() {
+        let mut job = CleaningJob {
+            path: ".".to_string(),
+            patterns: vec![],
+            dry_run: false,
+            skip_confirmation: false,
+        };
+        for p in PATTERNS {
+            job.patterns.push(p.to_string());
+        }
+
+        let toml = toml::to_string(&job).unwrap();
+        assert!(!toml.is_empty());
+        let outfile = "tests/out.toml";
+        fs::write(outfile, toml)
+            .expect("could not write toml to file.");
+        assert!(fs::metadata(outfile).unwrap().is_file());
+        std::fs::remove_file(outfile)
+            .expect("outfile.toml could not be removed");
+    }
+
+
 }

@@ -17,3 +17,4 @@ walkdir = "2"
 
 [dev-dependencies]
 toml = "0.8.2"
+serde = "1.0.189"
