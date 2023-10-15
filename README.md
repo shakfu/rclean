@@ -11,12 +11,14 @@ Program to cleanup non-essential files or directories
 Usage: rclean [OPTIONS]
 
 Options:
-  -p, --path <PATH>        Path to begin default cleaning [default: .]
+  -p, --path <PATH>        Working Directory [default: .]
   -y, --skip-confirmation  Skip confirmation
   -d, --dry-run            Dry-run without actual removal
+  -g, --glob <GLOB>        Specify custom glob pattern(s)
+  -l, --list               list default glob patterns
+  -c, --configfile         Configure from settings file
   -h, --help               Print help
   -V, --version            Print version
-
 ```
 
 Currently a set of glob patterns are specified in the code itself:
