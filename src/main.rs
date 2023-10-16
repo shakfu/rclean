@@ -6,7 +6,7 @@ use globset::{Glob, GlobSetBuilder};
 use log::{debug, error, info, trace, warn};
 use logging_timer::{stime, time};
 use serde::{Deserialize, Serialize};
-use simplelog::{Color, ColorChoice, ConfigBuilder, Level, LevelFilter, TermLogger, TerminalMode};
+use simplelog::ConfigBuilder;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -152,21 +152,21 @@ impl CleaningJob {
 // main function
 
 fn main() {
-    let logging_config = ConfigBuilder::new()
-        .set_level_color(Level::Info, Some(Color::Green))
-        .set_level_color(Level::Trace, Some(Color::Magenta))
+    let logging_config = simplelog::ConfigBuilder::new()
+        .set_level_color(simplelog::Level::Info, Some(simplelog::Color::Green))
+        .set_level_color(simplelog::Level::Trace, Some(simplelog::Color::Magenta))
         .build();
 
-    TermLogger::init(
-        LevelFilter::Trace,
+    simplelog::TermLogger::init(
+        simplelog::LevelFilter::Trace,
         logging_config,
-        TerminalMode::Mixed,
-        ColorChoice::Auto,
+        simplelog::TerminalMode::Mixed,
+        simplelog::ColorChoice::Auto,
     );
 
     let args = Args::parse();
     if args.configfile {
-        let settings_file = std::path::Path::new(SETTINGS_FILENAME);
+        let settings_file = Path::new(SETTINGS_FILENAME);
         if settings_file.exists() {
             info!("using settings file: {:?}", SETTINGS_FILENAME);
             let contents = fs::read_to_string(SETTINGS_FILENAME).expect("cannot read file");
