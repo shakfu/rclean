@@ -1,8 +1,12 @@
 # rclean
 
-A simple commandline code cleanup script in rust to recursively remove unnecessary files and directories matching a list of glob patterns from a given path.
+A simple commandline code cleanup tool in rust to recursively remove unnecessary files and directories matching a list of glob patterns from a given path.
 
-It has the following api:
+The design follows to some extent a mature python script `clean.py` in the `scripts` folder which has been used for code cleanups. The intention is for the rust version to provide some or all of its features and provide improved preformance.
+
+## Usage
+
+`rclean` has the following api:
 
 ```bash
 % rclean --help
@@ -16,20 +20,18 @@ Options:
   -d, --dry-run            Dry-run without actual removal
   -g, --glob <GLOB>        Specify custom glob pattern(s)
   -l, --list               list default glob patterns
-  -c, --configfile         Configure from settings file
+  -c, --configfile         Configure from 'rclean.toml' file
   -h, --help               Print help
   -V, --version            Print version
 ```
 
-Currently a set of glob patterns are specified in the code itself:
+A `safe` set of glob patterns are provided by default in the code itself:
 
 ```rust
 const PATTERNS: [&str;14] = [
     // directory
     "**/.coverage",
     "**/.DS_Store",
-    // ".egg-info",
-    "**/.cache",
     "**/.mypy_cache",
     "**/.pylint_cache",
     "**/.pytest_cache",
@@ -37,20 +39,23 @@ const PATTERNS: [&str;14] = [
     "**/__pycache__",
     // file
     "**/.bash_history",
-    "*.log",
-    "*.o",
-    "*.py[co]",
     "**/.python_history",
     "**/pip-log.txt",
 ];
 ```
 
-The design follows to some extent a mature python script `clean.py` in the `scripts` folder which has been used previously for code cleanups. The intention is for the rust version to provide some or all of its features and provide improved preformance.
+These defaults can be overriden if `rclean` finds an `rclean.toml` file in the local directory and and the `-c` or `--configfile` option is used.
+
+Otherwise, it is also possible to provided custom glob patterns to remove files and directories as follows:
+
+```bash
+rclean -g "*.log" -g "**/*.cache" 
+```
 
 
 ## TODO
 
-- [ ] Add project, or home directory-level configuration 
+- [x] Add project, or home directory-level configuration 
 
 - [ ] test on windows
     - see [remove_dir_all](https://crates.io/crates/remove_dir_all)

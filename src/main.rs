@@ -1,17 +1,16 @@
 #![allow(unused)]
 
 use clap::Parser;
-use toml::Table;
-use serde::Deserialize;
 use dialoguer::Confirm;
 use globset::{Glob, GlobSetBuilder};
 use log::{debug, error, info, trace, warn};
 use logging_timer::{stime, time};
+use serde::Deserialize;
 use simplelog::{Color, ColorChoice, ConfigBuilder, Level, LevelFilter, TermLogger, TerminalMode};
 use std::fs;
 use std::path::PathBuf;
+use toml::Table;
 use walkdir::WalkDir;
-
 
 // --------------------------------------------------------------------
 // constants
@@ -19,12 +18,10 @@ use walkdir::WalkDir;
 const SETTINGS_FILENAME: &str = "rclean.toml";
 
 /// list of glob patterns of files / directories to remove.
-const PATTERNS: [&str; 13] = [
+const PATTERNS: [&str; 10] = [
     // directory
     "**/.coverage",
     "**/.DS_Store",
-    // ".egg-info",
-    "**/.cache",
     "**/.mypy_cache",
     "**/.pylint_cache",
     "**/.pytest_cache",
@@ -32,8 +29,6 @@ const PATTERNS: [&str; 13] = [
     "**/__pycache__",
     // file
     "**/.bash_history",
-    "*.log",
-    "*.o",
     "**/.python_history",
     "**/pip-log.txt",
 ];
@@ -83,7 +78,7 @@ struct CleaningJob {
 impl CleaningJob {
     #[time("info")]
     fn run(&self) {
-        let mut xs: Vec<walkdir::DirEntry> = Vec::new();
+        let mut targets: Vec<walkdir::DirEntry> = Vec::new();
         let mut size = 0;
         let mut counter = 0;
         let mut builder = GlobSetBuilder::new();
@@ -94,7 +89,7 @@ impl CleaningJob {
         let path = std::path::Path::new(&self.path);
         for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
             if gset.is_match(entry.path()) {
-                xs.push(entry.clone());
+                targets.push(entry.clone());
                 println!("Matched: {:?}", entry.path().display());
                 match entry.path().metadata() {
                     Ok(info) => size += info.len(),
@@ -104,7 +99,7 @@ impl CleaningJob {
             }
         }
 
-        if !xs.is_empty() {
+        if !targets.is_empty() {
             let mut confirmation = false;
             if self.skip_confirmation {
                 confirmation = true;
@@ -117,7 +112,7 @@ impl CleaningJob {
 
             if confirmation {
                 // println!("Looks like you want to continue");
-                for name in xs.iter() {
+                for name in targets.iter() {
                     if !self.dry_run {
                         self.remove(name);
                     }
@@ -169,8 +164,7 @@ fn main() {
         let settings_file = std::path::Path::new(SETTINGS_FILENAME);
         if settings_file.exists() {
             info!("using settings file: {:?}", SETTINGS_FILENAME);
-            let contents = fs::read_to_string(SETTINGS_FILENAME)
-                .expect("cannot read file");
+            let contents = fs::read_to_string(SETTINGS_FILENAME).expect("cannot read file");
             let job: CleaningJob = toml::from_str(&contents).expect("cannot read");
             job.run();
         } else {
