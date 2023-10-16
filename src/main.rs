@@ -19,7 +19,7 @@ use walkdir::WalkDir;
 const SETTINGS_FILENAME: &str = "rclean.toml";
 
 /// list of glob patterns of files / directories to remove.
-const PATTERNS: [&str; 14] = [
+const PATTERNS: [&str; 13] = [
     // directory
     "**/.coverage",
     "**/.DS_Store",
@@ -34,7 +34,6 @@ const PATTERNS: [&str; 14] = [
     "**/.bash_history",
     "*.log",
     "*.o",
-    "*.py[co]",
     "**/.python_history",
     "**/pip-log.txt",
 ];

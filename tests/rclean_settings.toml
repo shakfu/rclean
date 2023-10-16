@@ -14,7 +14,7 @@ patterns = [
     "**/.bash_history",
     "*.log",
     "*.o",
-    "*.py[co]",
+    # "*.py[co]",
     "**/.python_history",
     "**/pip-log.txt",
 ]
