@@ -1,16 +1,13 @@
-#![allow(unused)]
+// #![allow(unused)]
 
 use clap::Parser;
 use dialoguer::Confirm;
 use globset::{Glob, GlobSetBuilder};
-use log::{debug, error, info, trace, warn};
-use logging_timer::{stime, time};
+use log::{error, info, warn};
+use logging_timer::time;
 use serde::{Deserialize, Serialize};
-use simplelog::ConfigBuilder;
 use std::fs;
 use std::path::Path;
-use std::path::PathBuf;
-use toml::Table;
 use walkdir::WalkDir;
 
 // --------------------------------------------------------------------
@@ -98,7 +95,7 @@ impl CleaningJob {
                 println!("Matched: {:?}", entry.path().display());
                 match entry.path().metadata() {
                     Ok(info) => size += info.len(),
-                    Err(e) => eprintln!("metadata not found"),
+                    Err(e) => eprintln!("metadata not found: {:?}", e),
                 }
                 counter += 1;
             }
@@ -106,6 +103,7 @@ impl CleaningJob {
 
         if !targets.is_empty() {
             let mut confirmation = false;
+            assert!(!confirmation); // to silence warning
             if self.skip_confirmation {
                 confirmation = true;
             } else {
@@ -141,9 +139,9 @@ impl CleaningJob {
         let p = entry.path();
         // println!("Deleting {}", p.display());
         if entry.metadata().unwrap().is_file() {
-            fs::remove_file(p);
+            fs::remove_file(p).expect("could not remove file: {p}");
         } else {
-            fs::remove_dir_all(p);
+            fs::remove_dir_all(p).expect("could not remove directory: {p}");
         }
     }
 }
@@ -162,7 +160,7 @@ fn main() {
         logging_config,
         simplelog::TerminalMode::Mixed,
         simplelog::ColorChoice::Auto,
-    );
+    ).expect("could not initialize logging");
 
     let args = Args::parse();
     if args.configfile {
