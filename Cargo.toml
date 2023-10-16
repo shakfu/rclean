@@ -7,14 +7,11 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.3.19", features = ["derive"] }
-config = "0.13.3"
 dialoguer = "0.11.0"
 globset = "0.4.13"
 log = "0.4.20"
 logging_timer = "1.1.0"
+serde = { version = "1.0.189", features = ["derive"] }
+toml = "0.8.2"
 simplelog = "0.12.1"
 walkdir = "2"
-
-[dev-dependencies]
-toml = "0.8.2"
-serde = "1.0.189"

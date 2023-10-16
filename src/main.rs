@@ -1,7 +1,8 @@
 #![allow(unused)]
 
 use clap::Parser;
-use config::Config;
+use toml::Table;
+use serde::Deserialize;
 use dialoguer::Confirm;
 use globset::{Glob, GlobSetBuilder};
 use log::{debug, error, info, trace, warn};
@@ -11,10 +12,11 @@ use std::fs;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
+
 // --------------------------------------------------------------------
 // constants
 
-const SETTINGS_FILENAME: &str = "rclean_settings.toml";
+const SETTINGS_FILENAME: &str = "rclean.toml";
 
 /// list of glob patterns of files / directories to remove.
 const PATTERNS: [&str; 14] = [
@@ -64,14 +66,14 @@ struct Args {
     #[arg(short, long)]
     list: bool,
 
-    /// Configure from settings file
+    /// Configure from 'rclean.toml' file
     #[arg(short, long)]
     configfile: bool,
 }
 
 // --------------------------------------------------------------------
 // core
-
+#[derive(Deserialize)]
 struct CleaningJob {
     path: String,
     patterns: Vec<String>,
@@ -168,30 +170,12 @@ fn main() {
         let settings_file = std::path::Path::new(SETTINGS_FILENAME);
         if settings_file.exists() {
             info!("using settings file: {:?}", SETTINGS_FILENAME);
-            let settings = Config::builder()
-                .add_source(config::File::with_name(settings_file.to_str().unwrap()))
-                .build()
-                .unwrap();
-
-            let path = settings.get_string("path").unwrap();
-            let pattern_array = settings.get_array("patterns").unwrap();
-            let dry_run = settings.get_bool("dry_run").unwrap();
-            let skip_confirmation = settings.get_bool("skip_confirmation").unwrap();
-
-            let mut job = CleaningJob {
-                path,
-                patterns: vec![],
-                dry_run,
-                skip_confirmation,
-            };
-            if job.patterns.is_empty() {
-                for p in pattern_array {
-                    job.patterns.push(p.to_string());
-                }
-            }
+            let contents = fs::read_to_string(SETTINGS_FILENAME)
+                .expect("cannot read file");
+            let job: CleaningJob = toml::from_str(&contents).expect("cannot read");
             job.run();
         } else {
-            error!("Error: configfile {:?} not found", SETTINGS_FILENAME);
+            error!("Error: settings file {:?} not found", SETTINGS_FILENAME);
         }
     } else if args.list {
         info!("default patterns: {:?}", PATTERNS);
