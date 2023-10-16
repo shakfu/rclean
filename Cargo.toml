@@ -15,3 +15,9 @@ serde = { version = "1.0.189", features = ["derive"] }
 toml = "0.8.2"
 simplelog = "0.12.1"
 walkdir = "2"
+
+[profile.release]
+strip = true    # Automatically strip symbols from the binary.
+opt-level = "z" # Optimize for size.
+lto = true      # Enable link time optimization
+# panic = "abort"
