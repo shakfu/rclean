@@ -5,9 +5,10 @@ use dialoguer::Confirm;
 use globset::{Glob, GlobSetBuilder};
 use log::{debug, error, info, trace, warn};
 use logging_timer::{stime, time};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use simplelog::{Color, ColorChoice, ConfigBuilder, Level, LevelFilter, TermLogger, TerminalMode};
 use std::fs;
+use std::path::Path;
 use std::path::PathBuf;
 use toml::Table;
 use walkdir::WalkDir;
@@ -44,30 +45,34 @@ struct Args {
     #[arg(short, long, default_value_os = ".")]
     path: String,
 
-    /// Skip confirmation
-    #[arg(short = 'y', long)]
-    skip_confirmation: bool,
+    /// Specify custom glob pattern(s)
+    #[arg(short, long)]
+    glob: Option<Vec<String>>,
+
+    /// Configure from 'rclean.toml' file
+    #[arg(short, long)]
+    configfile: bool,
+
+    /// Write default 'rclean.toml' file
+    #[arg(short, long)]
+    write_configfile: bool,
 
     /// Dry-run without actual removal
     #[arg(short, long)]
     dry_run: bool,
 
-    /// Specify custom glob pattern(s)
-    #[arg(short, long)]
-    glob: Option<Vec<String>>,
+    /// Skip confirmation
+    #[arg(short = 'y', long)]
+    skip_confirmation: bool,
 
     /// list default glob patterns
     #[arg(short, long)]
     list: bool,
-
-    /// Configure from 'rclean.toml' file
-    #[arg(short, long)]
-    configfile: bool,
 }
 
 // --------------------------------------------------------------------
 // core
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct CleaningJob {
     path: String,
     patterns: Vec<String>,
@@ -86,7 +91,7 @@ impl CleaningJob {
             builder.add(Glob::new(pattern).unwrap());
         }
         let gset = builder.build().unwrap();
-        let path = std::path::Path::new(&self.path);
+        let path = Path::new(&self.path);
         for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
             if gset.is_match(entry.path()) {
                 targets.push(entry.clone());
@@ -184,6 +189,18 @@ fn main() {
                 job.patterns.push(String::from(p));
             }
         }
-        job.run();
+        if args.write_configfile {
+            let toml: String = toml::to_string(&job).unwrap();
+            let cfg_out = Path::new(SETTINGS_FILENAME);
+            if !Path::new(cfg_out).exists() {
+                info!("generating default 'rclean.toml' file");
+                fs::write(cfg_out, toml).unwrap();
+            } else {
+                error!("cannot overwrite existing 'rclean.toml' file");
+                return;
+            }
+        } else {
+            job.run();
+        }
     }
 }

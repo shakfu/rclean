@@ -16,11 +16,12 @@ Usage: rclean [OPTIONS]
 
 Options:
   -p, --path <PATH>        Working Directory [default: .]
-  -y, --skip-confirmation  Skip confirmation
-  -d, --dry-run            Dry-run without actual removal
   -g, --glob <GLOB>        Specify custom glob pattern(s)
-  -l, --list               list default glob patterns
   -c, --configfile         Configure from 'rclean.toml' file
+  -w, --write-configfile   Write default 'rclean.toml' file
+  -d, --dry-run            Dry-run without actual removal
+  -y, --skip-confirmation  Skip confirmation
+  -l, --list               list default glob patterns
   -h, --help               Print help
   -V, --version            Print version
 ```
@@ -63,6 +64,6 @@ rclean -g "*.log" -g "**/*.cache"
 
 ## Links
 
-- This was referenced and improved in a stack-overflow [question](https://stackoverflow.com/questions/76797185/how-to-write-a-recursive-file-directory-code-cleanup-function-in-rust)
+- Initial version referenced and improved on [stack-overflow](https://stackoverflow.com/questions/76797185/how-to-write-a-recursive-file-directory-code-cleanup-function-in-rust)
 
 - [Vector of Actions](https://stackoverflow.com/questions/31736656/how-to-implement-a-vector-array-of-functions-in-rust-when-the-functions-co)
