@@ -1,3 +1,5 @@
+pub mod constants;
+
 use dialoguer::Confirm;
 use globset::{Glob, GlobSetBuilder};
 use log::{info, warn};
@@ -19,6 +21,10 @@ pub struct CleaningJob {
 }
 
 impl CleaningJob {
+    pub fn new(path: String, patterns: Vec<String>, dry_run: bool, skip_confirmation: bool) -> Self { 
+        Self { path, patterns, dry_run, skip_confirmation }
+    }
+
     #[time("info")]
     pub fn run(&self) {
         let mut targets: Vec<walkdir::DirEntry> = Vec::new();
