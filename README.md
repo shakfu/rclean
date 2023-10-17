@@ -17,8 +17,8 @@ Usage: rclean [OPTIONS]
 Options:
   -p, --path <PATH>        Working Directory [default: .]
   -g, --glob <GLOB>        Specify custom glob pattern(s)
-  -c, --configfile         Configure from 'rclean.toml' file
-  -w, --write-configfile   Write default 'rclean.toml' file
+  -c, --configfile         Configure from '.rclean.toml' file
+  -w, --write-configfile   Write default '.rclean.toml' file
   -d, --dry-run            Dry-run without actual removal
   -y, --skip-confirmation  Skip confirmation
   -l, --list               list default glob patterns
@@ -45,7 +45,7 @@ const PATTERNS: [&str;14] = [
 ];
 ```
 
-These defaults can be overriden if `rclean` finds an `rclean.toml` file in the local directory and the `-c` or `--configfile` option is used.
+These defaults can be overriden if `rclean` finds an `.rclean.toml` file in the local directory and the `-c` or `--configfile` option is used.
 
 Otherwise, it is also possible to provided custom glob patterns to remove files and directories as follows:
 

@@ -1,7 +1,7 @@
 // --------------------------------------------------------------------
 // constants
 
-pub const SETTINGS_FILENAME: &str = "rclean.toml";
+pub const SETTINGS_FILENAME: &str = ".rclean.toml";
 
 /// list of glob patterns of files / directories to remove.
 pub const PATTERNS: [&str; 10] = [

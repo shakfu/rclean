@@ -21,11 +21,11 @@ struct Args {
     #[arg(short, long)]
     glob: Option<Vec<String>>,
 
-    /// Configure from 'rclean.toml' file
+    /// Configure from '.rclean.toml' file
     #[arg(short, long)]
     configfile: bool,
 
-    /// Write default 'rclean.toml' file
+    /// Write default '.rclean.toml' file
     #[arg(short, long)]
     write_configfile: bool,
 
@@ -64,10 +64,11 @@ fn write_configfile(job: &CleaningJob) {
     let toml: String = toml::to_string(&job).unwrap();
     let cfg_out = Path::new(SETTINGS_FILENAME);
     if !Path::new(cfg_out).exists() {
-        info!("generating default 'rclean.toml' file");
+        info!("generating default '{SETTINGS_FILENAME}' file");
         fs::write(cfg_out, toml).unwrap();
     } else {
-        error!("cannot overwrite existing 'rclean.toml' file");
+        // error!("cannot overwrite existing 'rclean.toml' file");
+        error!("cannot overwrite existing '{SETTINGS_FILENAME}' file");
     }
 }
 
@@ -80,7 +81,7 @@ fn run_job_from_configfile() {
         let mut job: CleaningJob = toml::from_str(&contents).expect("cannot read");
         job.run();
     } else {
-        error!("Error: settings file {:?} not found", SETTINGS_FILENAME);
+        error!("Error: settings file '{SETTINGS_FILENAME}' not found");
     }
 }
 
