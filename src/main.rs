@@ -3,8 +3,8 @@ use log::{error, info};
 use std::fs;
 use std::path::Path;
 
-use rclean::CleaningJob;
 use rclean::constants::{PATTERNS, SETTINGS_FILENAME};
+use rclean::CleaningJob;
 
 // --------------------------------------------------------------------
 // cli api
@@ -52,7 +52,7 @@ fn init_logging() {
         .build();
 
     simplelog::TermLogger::init(
-        simplelog::LevelFilter::Trace,
+        simplelog::LevelFilter::Info,
         logging_config,
         simplelog::TerminalMode::Mixed,
         simplelog::ColorChoice::Auto,
@@ -75,8 +75,9 @@ fn run_job_from_configfile() {
     let settings_file = Path::new(SETTINGS_FILENAME);
     if settings_file.exists() {
         info!("using settings file: {:?}", SETTINGS_FILENAME);
-        let contents = fs::read_to_string(SETTINGS_FILENAME).expect("cannot read file");
-        let job: CleaningJob = toml::from_str(&contents).expect("cannot read");
+        let contents = fs::read_to_string(SETTINGS_FILENAME)
+            .expect("cannot read file");
+        let mut job: CleaningJob = toml::from_str(&contents).expect("cannot read");
         job.run();
     } else {
         error!("Error: settings file {:?} not found", SETTINGS_FILENAME);
@@ -93,15 +94,11 @@ fn main() {
     } else {
         let mut job = CleaningJob::new(
             args.path,
-            args.glob.unwrap_or(vec![]),
+            args.glob.unwrap_or(
+                PATTERNS.iter().map(|x| x.to_string()).collect()),
             args.dry_run,
             args.skip_confirmation,
         );
-        if job.patterns.is_empty() {
-            for p in PATTERNS {
-                job.patterns.push(String::from(p));
-            }
-        }
         if args.write_configfile {
             write_configfile(&job);
         } else {

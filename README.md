@@ -2,7 +2,7 @@
 
 A simple commandline code cleanup tool in rust to recursively remove unnecessary files and directories matching a list of glob patterns from a given path.
 
-The design follows to some extent a mature python script `clean.py` in the `scripts` folder which has been used for code cleanups. The intention is for the rust version to provide some or all of its features and provide improved preformance.
+By default, confirmation is asked prior to removal.
 
 ## Usage
 
@@ -45,7 +45,7 @@ const PATTERNS: [&str;14] = [
 ];
 ```
 
-These defaults can be overriden if `rclean` finds an `rclean.toml` file in the local directory and and the `-c` or `--configfile` option is used.
+These defaults can be overriden if `rclean` finds an `rclean.toml` file in the local directory and the `-c` or `--configfile` option is used.
 
 Otherwise, it is also possible to provided custom glob patterns to remove files and directories as follows:
 
@@ -54,13 +54,19 @@ rclean -g "*.log" -g "**/*.cache"
 ```
 
 
+# Devnotes
+
+- The design follows to some extent a mature python script `clean.py` in the `scripts` folder which has been used for code cleanups. The intention is for the rust version to provide some or all of its features and provide improved preformance.
+
+
+
+
 ## TODO
 
 - [x] Add project, or home directory-level configuration 
 
 - [ ] test on windows
     - see [remove_dir_all](https://crates.io/crates/remove_dir_all)
-
 
 ## Links
 

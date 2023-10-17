@@ -18,18 +18,29 @@ pub struct CleaningJob {
     pub patterns: Vec<String>,
     pub dry_run: bool,
     pub skip_confirmation: bool,
+    #[serde(skip_serializing, skip_deserializing)]
+    targets: Vec<walkdir::DirEntry>,
+    #[serde(skip_serializing, skip_deserializing)]
+    size: u64,
+    #[serde(skip_serializing, skip_deserializing)]
+    counter: i32,
 }
 
 impl CleaningJob {
     pub fn new(path: String, patterns: Vec<String>, dry_run: bool, skip_confirmation: bool) -> Self { 
-        Self { path, patterns, dry_run, skip_confirmation }
+        Self { 
+            path, 
+            patterns,
+            dry_run,
+            skip_confirmation,
+            targets: Vec::new(),
+            size: 0,
+            counter: 0, 
+        }
     }
 
     #[time("info")]
-    pub fn run(&self) {
-        let mut targets: Vec<walkdir::DirEntry> = Vec::new();
-        let mut size = 0;
-        let mut counter = 0;
+    pub fn run(&mut self) {
         let mut builder = GlobSetBuilder::new();
         for pattern in self.patterns.iter() {
             builder.add(Glob::new(pattern).unwrap());
@@ -38,51 +49,52 @@ impl CleaningJob {
         let path = Path::new(&self.path);
         for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
             if gset.is_match(entry.path()) {
-                targets.push(entry.clone());
-                println!("Matched: {:?}", entry.path().display());
+                self.targets.push(entry.clone());
+                info!("Matched: {:?}", entry.path().display());
                 match entry.path().metadata() {
-                    Ok(info) => size += info.len(),
+                    Ok(info) => self.size += info.len(),
                     Err(e) => eprintln!("metadata not found: {:?}", e),
                 }
-                counter += 1;
+                self.counter += 1;
             }
         }
 
-        if !targets.is_empty() {
-            let mut confirmation = false;
-            assert!(!confirmation); // to silence warning
+        if !self.targets.is_empty() {
             if self.skip_confirmation {
-                confirmation = true;
+                self.remove_targets();
             } else {
-                confirmation = Confirm::new()
+                let confirmation = Confirm::new()
                     .with_prompt("Do you want to delete the above?")
                     .interact()
                     .unwrap();
-            }
 
-            if confirmation {
-                // println!("Looks like you want to continue");
-                for name in targets.iter() {
-                    if !self.dry_run {
-                        self.remove(name);
-                    }
+                if confirmation {
+                    self.remove_targets();
+                } else {
+                    println!("nevermind then.");
                 }
-                if !self.dry_run {
-                    info!(
-                        "Deleted {} item(s) totalling {:.2} MB",
-                        counter,
-                        (size as f64) / 1000000.
-                    );
-                }
-            } else {
-                println!("nevermind then.");
             }
         } else {
             warn!("no matches found.");
         }
     }
+    
+    pub fn remove_targets(&self) {
+        for name in self.targets.iter() {
+            if !self.dry_run {
+                self.remove_target(name);
+            }
+        }
+        if !self.dry_run {
+            info!(
+                "Deleted {} item(s) totalling {:.2} MB",
+                self.counter,
+                (self.size as f64) / 1000000.
+            );
+        }
+    }
 
-    pub fn remove(&self, entry: &walkdir::DirEntry) {
+    pub fn remove_target(&self, entry: &walkdir::DirEntry) {
         let p = entry.path();
         // println!("Deleting {}", p.display());
         if entry.metadata().unwrap().is_file() {
