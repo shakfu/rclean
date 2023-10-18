@@ -11,7 +11,7 @@ license = "Public Domain"
 license-file = "LICENSE"
 keywords = ["clean", "cleanup"]
 categories = ["command-line-utilities"]
-include = ["/src", "LICENSE", "README.md"]
+include = ["/src", "Cargo.toml", "LICENSE", "README.md"]
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
