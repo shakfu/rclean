@@ -45,6 +45,7 @@ struct Args {
 // --------------------------------------------------------------------
 // main function
 
+/// configure and initialize logging
 fn init_logging() {
     let logging_config = simplelog::ConfigBuilder::new()
         .set_level_color(simplelog::Level::Info, Some(simplelog::Color::Green))
@@ -60,6 +61,7 @@ fn init_logging() {
     .expect("could not initialize logging");
 }
 
+/// generate default config file: '.rclean.toml'
 fn write_configfile(job: &CleaningJob) {
     let toml: String = toml::to_string(&job).unwrap();
     let cfg_out = Path::new(SETTINGS_FILENAME);
@@ -67,17 +69,16 @@ fn write_configfile(job: &CleaningJob) {
         info!("generating default '{SETTINGS_FILENAME}' file");
         fs::write(cfg_out, toml).unwrap();
     } else {
-        // error!("cannot overwrite existing 'rclean.toml' file");
         error!("cannot overwrite existing '{SETTINGS_FILENAME}' file");
     }
 }
 
+/// run cleanup job using configuration from '.rclean.toml' file
 fn run_job_from_configfile() {
     let settings_file = Path::new(SETTINGS_FILENAME);
     if settings_file.exists() {
         info!("using settings file: {:?}", SETTINGS_FILENAME);
-        let contents = fs::read_to_string(SETTINGS_FILENAME)
-            .expect("cannot read file");
+        let contents = fs::read_to_string(SETTINGS_FILENAME).expect("cannot read file");
         let mut job: CleaningJob = toml::from_str(&contents).expect("cannot read");
         job.run();
     } else {
@@ -95,8 +96,8 @@ fn main() {
     } else {
         let mut job = CleaningJob::new(
             args.path,
-            args.glob.unwrap_or(
-                PATTERNS.iter().map(|x| x.to_string()).collect()),
+            args.glob
+                .unwrap_or(PATTERNS.iter().map(|x| x.to_string()).collect()),
             args.dry_run,
             args.skip_confirmation,
         );

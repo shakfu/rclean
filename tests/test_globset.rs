@@ -1,9 +1,8 @@
-
 #[cfg(test)]
 mod tests {
     use globset::{Glob, GlobSetBuilder};
 
-    const PATTERNS: [&str;14] = [
+    const PATTERNS: [&str; 14] = [
         // directory
         ".coverage",
         ".DS_Store",
@@ -23,11 +22,7 @@ mod tests {
         "pip-log.txt",
     ];
 
-    const NOT_MATCH_EXAMPLES: [&str;3] = [
-        ".logending",
-        ".ofine",
-        ".offline",
-    ];
+    const NOT_MATCH_EXAMPLES: [&str; 3] = [".logending", ".ofine", ".offline"];
 
     #[test]
     fn it_works() {
@@ -44,7 +39,6 @@ mod tests {
         assert!(glob.is_match("abc/def/ghi/jkl/ok.pyc"));
     }
 
-
     #[test]
     fn test_globset_multi() {
         let mut builder = GlobSetBuilder::new();
@@ -54,7 +48,6 @@ mod tests {
         let set = builder.build().unwrap();
         for pattern in PATTERNS {
             assert!(set.is_match(pattern));
-
         }
     }
 
@@ -67,8 +60,6 @@ mod tests {
         let set = builder.build().unwrap();
         for pattern in NOT_MATCH_EXAMPLES {
             assert!(!set.is_match(pattern));
-
         }
     }
-
 }

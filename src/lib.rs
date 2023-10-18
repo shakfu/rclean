@@ -27,64 +27,71 @@ pub struct CleaningJob {
 }
 
 impl CleaningJob {
-    pub fn new(path: String, patterns: Vec<String>, dry_run: bool, skip_confirmation: bool) -> Self { 
-        Self { 
-            path, 
+    pub fn new(
+        path: String,
+        patterns: Vec<String>,
+        dry_run: bool,
+        skip_confirmation: bool,
+    ) -> Self {
+        Self {
+            path,
             patterns,
             dry_run,
             skip_confirmation,
             targets: Vec::new(),
             size: 0,
-            counter: 0, 
+            counter: 0,
         }
     }
 
     #[time("info")]
     pub fn run(&mut self) {
+        // setup path cases
+        let path = Path::new(&self.path);
+        let current_path = Path::new(".");
+        let parent_path = Path::new("..");
+
         let mut builder = GlobSetBuilder::new();
         for pattern in self.patterns.iter() {
             builder.add(Glob::new(pattern).unwrap());
         }
         let gset = builder.build().unwrap();
-        let path = Path::new(&self.path);
         for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
-            if gset.is_match(entry.path()) {
-                self.targets.push(entry.clone());
-                info!("Matched: {:?}", entry.path().display());
+            let entry_path = entry.path();
+            if gset.is_match(entry_path) {
                 match entry.path().metadata() {
                     Ok(info) => self.size += info.len(),
                     Err(e) => eprintln!("metadata not found: {:?}", e),
                 }
+                // handle "." || ".." cases
+                if entry_path == current_path || entry_path == parent_path {
+                    continue;
+                }
                 self.counter += 1;
-            }
-        }
-
-        if !self.targets.is_empty() {
-            if self.skip_confirmation {
-                self.remove_targets();
-            } else {
-                let confirmation = Confirm::new()
-                    .with_prompt("Do you want to delete the above?")
-                    .interact()
-                    .unwrap();
-
-                if confirmation {
-                    self.remove_targets();
+                if self.skip_confirmation {
+                    self.remove_entry(&entry);
+                    info!("Deleted: {:?}", entry_path.display());
                 } else {
-                    println!("nevermind then.");
+                    self.targets.push(entry.clone());
+                    info!("Matched: {:?}", entry_path.display());
                 }
             }
-        } else {
-            warn!("no matches found.");
         }
-    }
-    
-    pub fn remove_targets(&self) {
-        for name in self.targets.iter() {
-            if !self.dry_run {
-                self.remove_target(name);
+
+        if !self.targets.is_empty() && !self.skip_confirmation {
+            let confirmation = Confirm::new()
+                .with_prompt("Do you want to delete the above?")
+                .interact()
+                .unwrap();
+
+            if confirmation {
+                self.remove_targets();
+            } else {
+                warn!("Cleaning operation cancelled.");
+                return;
             }
         }
+
         if !self.dry_run {
             info!(
                 "Deleted {} item(s) totalling {:.2} MB",
@@ -94,9 +101,16 @@ impl CleaningJob {
         }
     }
 
-    pub fn remove_target(&self, entry: &walkdir::DirEntry) {
+    pub fn remove_targets(&self) {
+        for name in self.targets.iter() {
+            if !self.dry_run {
+                self.remove_entry(name);
+            }
+        }
+    }
+
+    pub fn remove_entry(&self, entry: &walkdir::DirEntry) {
         let p = entry.path();
-        // println!("Deleting {}", p.display());
         if entry.metadata().unwrap().is_file() {
             fs::remove_file(p).expect("could not remove file: {p}");
         } else {

@@ -1,9 +1,8 @@
-
 #[cfg(test)]
 mod tests {
-    use toml::Table;
+    use serde::{Deserialize, Serialize};
     use std::fs;
-    use serde::{Serialize, Deserialize};
+    use toml::Table;
 
     const PATTERNS: [&str; 14] = [
         // directory
@@ -52,15 +51,13 @@ mod tests {
 
     #[test]
     fn test_toml_load() {
-        let contents = fs::read_to_string("tests/rclean_settings.toml")
-            .expect("cannot read file");
+        let contents = fs::read_to_string("tests/rclean_settings.toml").expect("cannot read file");
         assert!(!contents.is_empty());
     }
 
     #[test]
     fn test_toml_table_from_file() {
-        let contents = fs::read_to_string("tests/rclean_settings.toml")
-            .expect("cannot read file");
+        let contents = fs::read_to_string("tests/rclean_settings.toml").expect("cannot read file");
         let table = contents.parse::<Table>().unwrap();
         assert_eq!(table["path"].as_str(), Some("."));
         //let array = table["patterns"].as_array();
@@ -82,12 +79,8 @@ mod tests {
         let toml = toml::to_string(&job).unwrap();
         assert!(!toml.is_empty());
         let outfile = "tests/out.toml";
-        fs::write(outfile, toml)
-            .expect("could not write toml to file.");
+        fs::write(outfile, toml).expect("could not write toml to file.");
         assert!(fs::metadata(outfile).unwrap().is_file());
-        std::fs::remove_file(outfile)
-            .expect("outfile.toml could not be removed");
+        std::fs::remove_file(outfile).expect("outfile.toml could not be removed");
     }
-
-
 }
