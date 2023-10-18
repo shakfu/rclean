@@ -2,7 +2,17 @@
 name = "rclean"
 version = "0.1.1"
 edition = "2021"
-
+authors = ["Shakeeb Alireza"]
+description = "A cleanup tool to recursively remove files and directories matching a set of glob patterns."
+readme = "README.md"
+homepage = "https://github.com/shakfu/rclean"
+repository = "https://github.com/shakfu/rclean"
+license = "Public Domain"
+license-file = "LICENSE"
+keywords = ["clean", "cleanup"]
+categories = ["command-line-utilities"]
+include = ["/src", "LICENSE", "README.md"]
+publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
