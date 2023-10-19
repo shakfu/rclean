@@ -1,8 +1,16 @@
 # rclean
 
-A simple commandline code cleanup tool in rust to recursively remove unnecessary files and directories matching a list of glob patterns from a given path.
+A simple commandline code cleanup tool in rust to recursively remove files and directories matching a list of glob patterns from a given path.
 
-By default, confirmation is asked prior to removal.
+It has a number of safety measures:
+
+- Safe defaults.
+- Dry-run option.
+- By default, confirmation is asked prior to removal.
+- Symlinks are not removed except with permission.
+- Paths which startwith ".." are skipped.
+- Configuration from file can only run with permission.
+
 
 ## Usage
 
@@ -10,7 +18,7 @@ By default, confirmation is asked prior to removal.
 
 ```bash
 % rclean --help
-Program to cleanup non-essential files or directories
+Safely remove files and directories matching a set of glob patterns.
 
 Usage: rclean [OPTIONS]
 
@@ -21,6 +29,7 @@ Options:
   -w, --write-configfile   Write default '.rclean.toml' file
   -d, --dry-run            Dry-run without actual removal
   -y, --skip-confirmation  Skip confirmation
+  -i, --include-symlinks   Include matched symlinks for removal
   -l, --list               list default glob patterns
   -h, --help               Print help
   -V, --version            Print version
@@ -53,15 +62,14 @@ Otherwise, it is also possible to provided custom glob patterns to remove files 
 rclean -g "*.log" -g "**/*.cache" 
 ```
 
-
-# Devnotes
+## Devnotes
 
 - The design follows to some extent a mature python script `clean.py` in the `scripts` folder which has been used for code cleanups. The intention is for the rust version to provide some or all of its features and provide improved preformance.
 
 
-
-
 ## TODO
+
+- Should path field be removed?
 
 - [x] Add project, or home directory-level configuration 
 

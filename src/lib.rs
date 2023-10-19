@@ -18,6 +18,7 @@ pub struct CleaningJob {
     pub patterns: Vec<String>,
     pub dry_run: bool,
     pub skip_confirmation: bool,
+    pub include_symlinks: bool,
     #[serde(skip_serializing, skip_deserializing)]
     targets: Vec<walkdir::DirEntry>,
     #[serde(skip_serializing, skip_deserializing)]
@@ -26,18 +27,35 @@ pub struct CleaningJob {
     counter: i32,
 }
 
+impl Default for CleaningJob {
+    fn default() -> Self {
+        Self {
+            path: ".".to_string(),
+            patterns: vec![],
+            dry_run: true,
+            skip_confirmation: false,
+            include_symlinks: false,
+            targets: Vec::new(),
+            size: 0,
+            counter: 0,
+        }
+    }
+}
+
 impl CleaningJob {
     pub fn new(
         path: String,
         patterns: Vec<String>,
         dry_run: bool,
         skip_confirmation: bool,
+        include_symlinks: bool,
     ) -> Self {
         Self {
             path,
             patterns,
             dry_run,
             skip_confirmation,
+            include_symlinks,
             targets: Vec::new(),
             size: 0,
             counter: 0,
@@ -46,7 +64,7 @@ impl CleaningJob {
 
     #[time("info")]
     pub fn run(&mut self) {
-        // setup path cases
+        // path cases
         let path = Path::new(&self.path);
         let current_path = Path::new(".");
         let parent_path = Path::new("..");
@@ -58,14 +76,20 @@ impl CleaningJob {
         let gset = builder.build().unwrap();
         for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
             let entry_path = entry.path();
+            // silently handle "." || ".." cases
+            if entry_path == current_path || entry_path == parent_path
+            {
+                continue;
+            }
+            // skip paths which startwith ".."
+            if entry_path.starts_with("..") {
+                warn!("skipping {:?}", entry_path.display());
+                continue;
+            }
             if gset.is_match(entry_path) {
                 match entry.path().metadata() {
                     Ok(info) => self.size += info.len(),
                     Err(e) => eprintln!("metadata not found: {:?}", e),
-                }
-                // handle "." || ".." cases
-                if entry_path == current_path || entry_path == parent_path {
-                    continue;
                 }
                 self.counter += 1;
                 if self.skip_confirmation {
@@ -111,10 +135,19 @@ impl CleaningJob {
 
     pub fn remove_entry(&self, entry: &walkdir::DirEntry) {
         let p = entry.path();
-        if entry.metadata().unwrap().is_file() {
+        let target = entry.metadata().unwrap();
+        if target.is_symlink() {
+            if self.include_symlinks {
+                fs::remove_file(p).expect("could not remove symlink: {p}");
+            } else {
+                warn!("skipping symlink: {:?}", entry.path().display());
+            }
+        } else if target.is_file() {
             fs::remove_file(p).expect("could not remove file: {p}");
-        } else {
+        } else if target.is_dir() {
             fs::remove_dir_all(p).expect("could not remove directory: {p}");
+        } else {
+            warn!("skipping unknowm: {:?}", entry.path().display());
         }
     }
 }

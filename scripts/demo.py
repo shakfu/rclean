@@ -2,11 +2,12 @@
 
 import os
 import string
+import shutil
 from pathlib import Path
-
+import subprocess
 
 dirs = [
-    ".cache",
+    # ".cache",
     ".coverage",
     ".DS_Store",
     ".mypy_cache",
@@ -24,8 +25,8 @@ files = [
 ]
 
 file_endings = [
-    ".log",
-    ".o",
+    # ".log",
+    # ".o",
     ".pyc",
 ]
 
@@ -40,26 +41,43 @@ def create_large_file(name, size=30):
         f.seek((2**size)-1)
         f.write(b"\0")
 
-def create_detritus(path: str):
-    path = Path(path)
+def create_detritus(parent: str | Path):
+    parent = Path(parent)
 
     for f in files:
-        p = Path(f)
+        p = parent / f
         p.touch()
 
     for i in bad_examples:
-        p = Path(i)
+        p = parent / i
         p.touch()
 
     for e in file_endings:
         for c in string.ascii_lowercase:
-            p = Path(f'{c}{e}')
+            p = parent / f'{c}{e}'
             p.touch()
 
     for d in dirs:
-        os.mkdir(d)
+        p = parent / d
+        os.mkdir(p)
 
-    create_large_file("hello.log")
+    big_file = parent / "big.pyc"
+    create_large_file(big_file)
+
+    link_to_big_file = parent / "link_to_big_file.pyc"
+    link_to_big_file.symlink_to(big_file.name)
+
+
+def main():
+    demo = Path('demo')
+    if demo.exists():
+        shutil.rmtree(demo)
+        demo = Path('demo')
+    demo.mkdir()
+    create_detritus(demo)
+    rclean = Path("target/debug/rclean")
+    assert rclean.exists()
+    subprocess.call(["../target/debug/rclean"], cwd=demo)
 
 if __name__ == '__main__':
-    create_detritus('.')
+    main()

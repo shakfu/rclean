@@ -37,6 +37,10 @@ struct Args {
     #[arg(short = 'y', long)]
     skip_confirmation: bool,
 
+    /// Include matched symlinks for removal
+    #[arg(short, long)]
+    include_symlinks: bool,
+
     /// list default glob patterns
     #[arg(short, long)]
     list: bool,
@@ -100,6 +104,7 @@ fn main() {
                 .unwrap_or(PATTERNS.iter().map(|x| x.to_string()).collect()),
             args.dry_run,
             args.skip_confirmation,
+            args.include_symlinks,
         );
         if args.write_configfile {
             write_configfile(&job);

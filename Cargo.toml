@@ -3,17 +3,15 @@ name = "rclean"
 version = "0.1.1"
 edition = "2021"
 authors = ["Shakeeb Alireza"]
-description = "A cleanup tool to recursively remove files and directories matching a set of glob patterns."
+description = "Safely remove files and directories matching a set of glob patterns."
 readme = "README.md"
 homepage = "https://github.com/shakfu/rclean"
 repository = "https://github.com/shakfu/rclean"
-license = "Public Domain"
 license-file = "LICENSE"
-keywords = ["clean", "cleanup"]
+keywords = ["clean", "delete"]
 categories = ["command-line-utilities"]
 include = ["/src", "Cargo.toml", "LICENSE", "README.md"]
 publish = false
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 clap = { version = "4.3.19", features = ["derive"] }
@@ -27,7 +25,7 @@ simplelog = "0.12.1"
 walkdir = "2"
 
 [profile.release]
-strip = true    # Automatically strip symbols from the binary.
-opt-level = "z" # Optimize for size.
-lto = true      # Enable link time optimization
+strip = true        # Automatically strip symbols from the binary.
+opt-level = "z"     # Optimize for size.
+lto = true          # Enable link time optimization
 # panic = "abort"
