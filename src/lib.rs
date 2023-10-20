@@ -12,6 +12,8 @@ use walkdir::WalkDir;
 // --------------------------------------------------------------------
 // core
 
+/// Main configuration object for cleaning jobs with partial
+/// with selective (de)serialization
 #[derive(Serialize, Deserialize)]
 pub struct CleaningJob {
     pub path: String,
@@ -28,6 +30,7 @@ pub struct CleaningJob {
 }
 
 impl Default for CleaningJob {
+    /// default values for a cleaningjob instance
     fn default() -> Self {
         Self {
             path: ".".to_string(),
@@ -43,6 +46,7 @@ impl Default for CleaningJob {
 }
 
 impl CleaningJob {
+    /// constructor
     pub fn new(
         path: String,
         patterns: Vec<String>,
@@ -62,6 +66,7 @@ impl CleaningJob {
         }
     }
 
+    /// run the cleaning job
     #[time("info")]
     pub fn run(&mut self) {
         // path cases
@@ -77,8 +82,7 @@ impl CleaningJob {
         for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
             let entry_path = entry.path();
             // silently handle "." || ".." cases
-            if entry_path == current_path || entry_path == parent_path
-            {
+            if entry_path == current_path || entry_path == parent_path {
                 continue;
             }
             // skip paths which startwith ".."
@@ -125,6 +129,7 @@ impl CleaningJob {
         }
     }
 
+    /// remove collected targets
     pub fn remove_targets(&self) {
         for name in self.targets.iter() {
             if !self.dry_run {
@@ -133,6 +138,7 @@ impl CleaningJob {
         }
     }
 
+    /// remove file or directory with some safety measures
     pub fn remove_entry(&self, entry: &walkdir::DirEntry) {
         let p = entry.path();
         let target = entry.metadata().unwrap();

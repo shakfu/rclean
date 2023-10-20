@@ -82,8 +82,11 @@ fn run_job_from_configfile() {
     let settings_file = Path::new(SETTINGS_FILENAME);
     if settings_file.exists() {
         info!("using settings file: {:?}", SETTINGS_FILENAME);
-        let contents = fs::read_to_string(SETTINGS_FILENAME).expect("cannot read file");
-        let mut job: CleaningJob = toml::from_str(&contents).expect("cannot read");
+        let Ok(contents) = fs::read_to_string(SETTINGS_FILENAME) else {
+            error!("cannot read file");
+            return;
+        };
+        let mut job: CleaningJob = toml::from_str(&contents).expect("cannot deerialize from .toml");
         job.run();
     } else {
         error!("Error: settings file '{SETTINGS_FILENAME}' not found");
