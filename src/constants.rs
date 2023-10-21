@@ -4,7 +4,7 @@
 pub const SETTINGS_FILENAME: &str = ".rclean.toml";
 
 /// list of glob patterns of files / directories to remove.
-pub const PATTERNS: [&str; 11] = [
+pub const PATTERNS: [&str; 10] = [
     // directory
     "**/__pycache__",
     "**/.coverage",
@@ -17,5 +17,4 @@ pub const PATTERNS: [&str; 11] = [
     "**/.bash_history",
     "**/.python_history",
     "**/pip-log.txt",
-    "**/*.pyc",
 ];
