@@ -6,7 +6,7 @@ use log::{error, info};
 use std::fs;
 use std::path::Path;
 
-use rclean::constants::{PATTERNS, SETTINGS_FILENAME};
+use rclean::constants::{get_default_patterns, SETTINGS_FILENAME};
 use rclean::CleaningJob;
 
 // --------------------------------------------------------------------
@@ -115,12 +115,12 @@ fn main() {
     if args.configfile {
         run_job_from_configfile();
     } else if args.list {
-        info!("default patterns: {:?}", PATTERNS);
+        info!("default patterns: {:?}", get_default_patterns());
     } else {
         let mut job = CleaningJob::new(
             args.path,
             args.glob
-                .unwrap_or(PATTERNS.iter().map(|x| x.to_string()).collect()),
+                .unwrap_or(get_default_patterns().iter().map(|x| x.to_string()).collect()),
             args.dry_run,
             args.skip_confirmation,
             args.include_symlinks,

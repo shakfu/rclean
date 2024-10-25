@@ -3,18 +3,19 @@
 
 pub const SETTINGS_FILENAME: &str = ".rclean.toml";
 
-/// list of glob patterns of files / directories to remove.
-pub const PATTERNS: [&str; 10] = [
-    // directory
-    "**/__pycache__",
-    "**/.coverage",
-    "**/.DS_Store",
-    "**/.mypy_cache",
-    "**/.pylint_cache",
-    "**/.pytest_cache",
-    "**/.ruff_cache",
-    // file
-    "**/.bash_history",
-    "**/.python_history",
-    "**/pip-log.txt",
-];
+pub fn get_default_patterns() -> Vec<String> {
+    vec![
+        // directory
+        String::from("**/__pycache__"),
+        String::from("**/.coverage"),
+        String::from("**/.DS_Store"),
+        String::from("**/.mypy_cache"),
+        String::from("**/.pylint_cache"),
+        String::from("**/.pytest_cache"),
+        String::from("**/.ruff_cache"),
+        // file
+        String::from("**/.bash_history"),
+        String::from("**/.python_history"),
+        String::from("**/pip-log.txt"),
+    ]
+}
