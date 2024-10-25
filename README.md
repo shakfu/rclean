@@ -11,7 +11,6 @@ It has a number of safety measures:
 - Paths which startwith ".." are skipped.
 - Configuration from file can only run with permission.
 
-
 ## Usage
 
 `rclean` has the following api:
@@ -66,15 +65,15 @@ rclean -g "*.log" -g "**/*.cache"
 
 - The design follows to some extent a mature python script `clean.py` in the `scripts` folder which has been used for code cleanups. The intention is for the rust version to provide some or all of its features and provide improved preformance.
 
-
 ## TODO
 
 - Should path field be removed?
 
-- [x] Add project, or home directory-level configuration 
+- [x] Add project, or home directory-level configuration
 
 - [ ] test on windows
-    - see [remove_dir_all](https://crates.io/crates/remove_dir_all)
+
+  - see [remove_dir_all](https://crates.io/crates/remove_dir_all)
 
 ## Links
 

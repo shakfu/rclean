@@ -1,3 +1,6 @@
+// --------------------------------------------------------------------
+// imports
+
 use clap::Parser;
 use log::{error, info};
 use std::fs;
@@ -50,6 +53,10 @@ struct Args {
 // main function
 
 /// configure and initialize logging
+///
+/// # Errors
+///
+/// This function will return an error if the logging cannot be initialized.
 fn init_logging() {
     let logging_config = simplelog::ConfigBuilder::new()
         .set_level_color(simplelog::Level::Info, Some(simplelog::Color::Green))
@@ -66,6 +73,10 @@ fn init_logging() {
 }
 
 /// generate default config file: '.rclean.toml'
+///
+/// # Errors
+///
+/// This function will return an error if the file cannot be written.
 fn write_configfile(job: &CleaningJob) {
     let toml: String = toml::to_string(&job).unwrap();
     let cfg_out = Path::new(SETTINGS_FILENAME);
@@ -78,6 +89,10 @@ fn write_configfile(job: &CleaningJob) {
 }
 
 /// run cleanup job using configuration from '.rclean.toml' file
+///
+/// # Errors
+///
+/// This function will return an error if the file cannot be read.
 fn run_job_from_configfile() {
     let settings_file = Path::new(SETTINGS_FILENAME);
     if settings_file.exists() {
@@ -93,6 +108,7 @@ fn run_job_from_configfile() {
     }
 }
 
+/// main function
 fn main() {
     init_logging();
     let args = Args::parse();

@@ -29,6 +29,7 @@ pub struct CleaningJob {
     counter: i32,
 }
 
+/// Default values for a cleaningjob instance
 impl Default for CleaningJob {
     /// default values for a cleaningjob instance
     fn default() -> Self {
@@ -45,6 +46,7 @@ impl Default for CleaningJob {
     }
 }
 
+/// CleaningJob methods
 impl CleaningJob {
     /// constructor
     pub fn new(
