@@ -37,20 +37,22 @@ Options:
 A `safe` set of glob patterns are provided by default in the code itself:
 
 ```rust
-const PATTERNS: [&str;14] = [
-    // directory
-    "**/.coverage",
-    "**/.DS_Store",
-    "**/.mypy_cache",
-    "**/.pylint_cache",
-    "**/.pytest_cache",
-    "**/.ruff_cache",
-    "**/__pycache__",
-    // file
-    "**/.bash_history",
-    "**/.python_history",
-    "**/pip-log.txt",
-];
+pub fn get_default_patterns() -> Vec<String> {
+    vec![
+        // directory
+        String::from("**/__pycache__"),
+        String::from("**/.coverage"),
+        String::from("**/.DS_Store"),
+        String::from("**/.mypy_cache"),
+        String::from("**/.pylint_cache"),
+        String::from("**/.pytest_cache"),
+        String::from("**/.ruff_cache"),
+        // file
+        String::from("**/.bash_history"),
+        String::from("**/.python_history"),
+        String::from("**/pip-log.txt"),
+    ]
+}
 ```
 
 These defaults can be overriden if `rclean` finds an `.rclean.toml` file in the local directory and the `-c` or `--configfile` option is used.
