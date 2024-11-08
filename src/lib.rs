@@ -1,6 +1,7 @@
 pub mod constants;
 
 use dialoguer::Confirm;
+use fs_extra::dir::get_size;
 use globset::{Glob, GlobSetBuilder};
 use log::{info, warn};
 use logging_timer::time;
@@ -94,7 +95,8 @@ impl CleaningJob {
             }
             if gset.is_match(entry_path) {
                 match entry.path().metadata() {
-                    Ok(info) => self.size += info.len(),
+                    // Ok(info) => self.size += info.len(),
+                    Ok(_info) => self.size += get_size(entry_path).unwrap(),
                     Err(e) => eprintln!("metadata not found: {:?}", e),
                 }
                 self.counter += 1;
@@ -134,7 +136,7 @@ impl CleaningJob {
     /// remove collected targets
     pub fn remove_targets(&self) {
         for name in self.targets.iter() {
-            if !self.dry_run {
+            if !self.dry_run {                
                 self.remove_entry(name);
             }
         }
