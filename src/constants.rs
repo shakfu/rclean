@@ -17,5 +17,6 @@ pub fn get_default_patterns() -> Vec<String> {
         String::from("**/.bash_history"),
         String::from("**/.python_history"),
         String::from("**/pip-log.txt"),
+        String::from("**/.ropeproject"),
     ]
 }

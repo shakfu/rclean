@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.x]
 
+- Update dependencies and added `.ropeproject` as a cleanup pattern
 
 ## [0.1.2]
 

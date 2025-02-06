@@ -9,6 +9,6 @@ build:
 clean:
 	@rm -rf target
 
-install:
+install: build
 	@cp target/release/rclean /usr/local/bin/
 	@echo "rclean installed"
