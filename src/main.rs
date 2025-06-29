@@ -44,6 +44,10 @@ struct Args {
     #[arg(short, long)]
     include_symlinks: bool,
 
+    /// Remove broken symlinks
+    #[arg(short, long)]
+    remove_broken_symlinks: bool,
+
     /// list default glob patterns
     #[arg(short, long)]
     list: bool,
@@ -96,7 +100,7 @@ fn write_configfile(job: &CleaningJob) {
 fn run_job_from_configfile() {
     let settings_file = Path::new(SETTINGS_FILENAME);
     if settings_file.exists() {
-        info!("using settings file: {:?}", SETTINGS_FILENAME);
+        info!("using settings file: {SETTINGS_FILENAME:?}");
         let Ok(contents) = fs::read_to_string(SETTINGS_FILENAME) else {
             error!("cannot read file");
             return;
@@ -124,6 +128,7 @@ fn main() {
             args.dry_run,
             args.skip_confirmation,
             args.include_symlinks,
+            args.remove_broken_symlinks,
         );
         if args.write_configfile {
             write_configfile(&job);

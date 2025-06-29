@@ -6,7 +6,7 @@ use globset::{Glob, GlobSetBuilder};
 use log::{info, warn};
 use logging_timer::time;
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::fs::{self};
 use std::path::Path;
 use walkdir::WalkDir;
 
@@ -22,6 +22,7 @@ pub struct CleaningJob {
     pub dry_run: bool,
     pub skip_confirmation: bool,
     pub include_symlinks: bool,
+    pub remove_broken_symlinks: bool,
     #[serde(skip_serializing, skip_deserializing)]
     targets: Vec<walkdir::DirEntry>,
     #[serde(skip_serializing, skip_deserializing)]
@@ -40,6 +41,7 @@ impl Default for CleaningJob {
             dry_run: true,
             skip_confirmation: false,
             include_symlinks: false,
+            remove_broken_symlinks: false,
             targets: Vec::new(),
             size: 0,
             counter: 0,
@@ -56,6 +58,7 @@ impl CleaningJob {
         dry_run: bool,
         skip_confirmation: bool,
         include_symlinks: bool,
+        remove_broken_symlinks: bool,
     ) -> Self {
         Self {
             path,
@@ -63,6 +66,7 @@ impl CleaningJob {
             dry_run,
             skip_confirmation,
             include_symlinks,
+            remove_broken_symlinks,
             targets: Vec::new(),
             size: 0,
             counter: 0,
@@ -93,20 +97,36 @@ impl CleaningJob {
                 warn!("skipping {:?}", entry_path.display());
                 continue;
             }
+
+            // check if path is a dead symlink
+            if self.remove_broken_symlinks && entry_path.is_symlink() {
+                // an error means it's broken
+                if let Err(_e) = fs::metadata(entry_path) {
+                    if self.skip_confirmation {
+                        self.remove_entry(&entry);
+                        info!("Deleted broken symlink: {:?}", entry_path.display());
+                    } else {
+                        self.targets.push(entry.clone());
+                        info!("Matched broken symlink: {:?}", entry_path.display());
+                    }
+                }
+            }
+
             if gset.is_match(entry_path) {
                 match entry.path().metadata() {
-                    // Ok(info) => self.size += info.len(),
                     Ok(_info) => self.size += get_size(entry_path).unwrap(),
-                    Err(e) => eprintln!("metadata not found: {:?}", e),
+                    Err(e) => eprintln!("metadata not found: {e:?}"),
+                }
+                if entry.path_is_symlink() && !self.include_symlinks {
+                    continue
                 }
                 self.counter += 1;
                 if self.skip_confirmation {
                     self.remove_entry(&entry);
                     info!("Deleted: {:?}", entry_path.display());
-                } else {
-                    self.targets.push(entry.clone());
-                    info!("Matched: {:?}", entry_path.display());
-                }
+                } 
+                self.targets.push(entry.clone());
+                info!("Matched: {:?}", entry_path.display());
             }
         }
 
@@ -147,11 +167,7 @@ impl CleaningJob {
         let p = entry.path();
         let target = entry.metadata().unwrap();
         if target.is_symlink() {
-            if self.include_symlinks {
-                fs::remove_file(p).expect("could not remove symlink: {p}");
-            } else {
-                warn!("skipping symlink: {:?}", entry.path().display());
-            }
+            fs::remove_file(p).expect("could not remove symlink: {p}");
         } else if target.is_file() {
             fs::remove_file(p).expect("could not remove file: {p}");
         } else if target.is_dir() {
