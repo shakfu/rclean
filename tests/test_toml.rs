@@ -30,6 +30,8 @@ mod tests {
         patterns: Vec<String>,
         dry_run: bool,
         skip_confirmation: bool,
+        include_symlinks: bool,
+        remove_broken_symlinks: bool,
     }
 
     #[test]
@@ -71,6 +73,8 @@ mod tests {
             patterns: vec![],
             dry_run: false,
             skip_confirmation: false,
+            include_symlinks: false,
+            remove_broken_symlinks: false,
         };
         for p in PATTERNS {
             job.patterns.push(p.to_string());

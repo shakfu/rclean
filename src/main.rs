@@ -5,9 +5,10 @@ use clap::Parser;
 use log::{error, info};
 use std::fs;
 use std::path::Path;
+use std::process;
 
 use rclean::constants::{get_default_patterns, SETTINGS_FILENAME};
-use rclean::CleaningJob;
+use rclean::{CleaningJob, Result};
 
 // --------------------------------------------------------------------
 // cli api
@@ -23,6 +24,10 @@ struct Args {
     /// Specify custom glob pattern(s)
     #[arg(short, long)]
     glob: Option<Vec<String>>,
+
+    /// Exclude patterns (files matching these will not be deleted)
+    #[arg(short, long)]
+    exclude: Option<Vec<String>>,
 
     /// Configure from '.rclean.toml' file
     #[arg(short, long)]
@@ -48,9 +53,53 @@ struct Args {
     #[arg(short, long)]
     remove_broken_symlinks: bool,
 
+    /// Display statistics by pattern
+    #[arg(short = 's', long)]
+    stats: bool,
+
+    /// Only remove files older than specified duration (e.g., "30d", "7d", "24h", "3600s")
+    #[arg(short = 'o', long)]
+    older_than: Option<String>,
+
+    /// Show progress bar during scanning
+    #[arg(short = 'P', long)]
+    progress: bool,
+
     /// list default glob patterns
     #[arg(short, long)]
     list: bool,
+}
+
+// --------------------------------------------------------------------
+// helper functions
+
+/// Parse duration string like "30d", "7d", "24h", "3600s" into seconds
+///
+/// # Errors
+///
+/// Returns error if the duration string is invalid
+fn parse_duration(duration: &str) -> Result<u64> {
+    let duration = duration.trim();
+    if duration.is_empty() {
+        return Err(rclean::CleanError::ConfigError("Duration cannot be empty".to_string()));
+    }
+
+    let (num_part, unit_part) = duration.split_at(duration.len() - 1);
+    let number: u64 = num_part.parse()
+        .map_err(|_| rclean::CleanError::ConfigError(format!("Invalid number in duration: {}", num_part)))?;
+
+    let multiplier = match unit_part {
+        "s" => 1,                    // seconds
+        "m" => 60,                   // minutes
+        "h" => 3600,                 // hours
+        "d" => 86400,                // days
+        "w" => 604800,               // weeks
+        _ => return Err(rclean::CleanError::ConfigError(
+            format!("Invalid duration unit '{}'. Use 's', 'm', 'h', 'd', or 'w'", unit_part)
+        )),
+    };
+
+    Ok(number * multiplier)
 }
 
 // --------------------------------------------------------------------
@@ -81,14 +130,19 @@ fn init_logging() {
 /// # Errors
 ///
 /// This function will return an error if the file cannot be written.
-fn write_configfile(job: &CleaningJob) {
-    let toml: String = toml::to_string(&job).unwrap();
+fn write_configfile(job: &CleaningJob) -> Result<()> {
+    let toml = toml::to_string(&job)
+        .map_err(|e| rclean::CleanError::ConfigError(format!("Failed to serialize config: {}", e)))?;
+
     let cfg_out = Path::new(SETTINGS_FILENAME);
     if !Path::new(cfg_out).exists() {
         info!("generating default '{SETTINGS_FILENAME}' file");
-        fs::write(cfg_out, toml).unwrap();
+        fs::write(cfg_out, toml)?;
+        Ok(())
     } else {
-        error!("cannot overwrite existing '{SETTINGS_FILENAME}' file");
+        Err(rclean::CleanError::ConfigError(
+            format!("Cannot overwrite existing '{SETTINGS_FILENAME}' file")
+        ))
     }
 }
 
@@ -97,43 +151,67 @@ fn write_configfile(job: &CleaningJob) {
 /// # Errors
 ///
 /// This function will return an error if the file cannot be read.
-fn run_job_from_configfile() {
+fn run_job_from_configfile() -> Result<()> {
     let settings_file = Path::new(SETTINGS_FILENAME);
-    if settings_file.exists() {
-        info!("using settings file: {SETTINGS_FILENAME:?}");
-        let Ok(contents) = fs::read_to_string(SETTINGS_FILENAME) else {
-            error!("cannot read file");
-            return;
-        };
-        let mut job: CleaningJob = toml::from_str(&contents).expect("cannot deerialize from .toml");
-        job.run();
-    } else {
-        error!("Error: settings file '{SETTINGS_FILENAME}' not found");
+    if !settings_file.exists() {
+        return Err(rclean::CleanError::ConfigError(
+            format!("Settings file '{SETTINGS_FILENAME}' not found")
+        ));
     }
+
+    info!("using settings file: {SETTINGS_FILENAME:?}");
+    let contents = fs::read_to_string(SETTINGS_FILENAME)?;
+    let mut job: CleaningJob = toml::from_str(&contents)
+        .map_err(|e| rclean::CleanError::ConfigError(format!("Cannot deserialize from .toml: {}", e)))?;
+
+    job.run()
 }
 
 /// main function
 fn main() {
     init_logging();
     let args = Args::parse();
-    if args.configfile {
-        run_job_from_configfile();
+
+    let result = if args.configfile {
+        run_job_from_configfile()
     } else if args.list {
         info!("default patterns: {:?}", get_default_patterns());
+        Ok(())
     } else {
-        let mut job = CleaningJob::new(
-            args.path,
-            args.glob
-                .unwrap_or(get_default_patterns().iter().map(|x| x.to_string()).collect()),
-            args.dry_run,
-            args.skip_confirmation,
-            args.include_symlinks,
-            args.remove_broken_symlinks,
-        );
-        if args.write_configfile {
-            write_configfile(&job);
+        // Parse duration if provided
+        let older_than_result = if let Some(ref duration_str) = args.older_than {
+            parse_duration(duration_str).map(Some)
         } else {
-            job.run();
+            Ok(None)
+        };
+
+        match older_than_result {
+            Ok(older_than_secs) => {
+                let mut job = CleaningJob::new(
+                    args.path,
+                    args.glob
+                        .unwrap_or_else(|| get_default_patterns().iter().map(|x| x.to_string()).collect()),
+                    args.exclude.unwrap_or_default(),
+                    args.dry_run,
+                    args.skip_confirmation,
+                    args.include_symlinks,
+                    args.remove_broken_symlinks,
+                    args.stats,
+                    older_than_secs,
+                    args.progress,
+                );
+                if args.write_configfile {
+                    write_configfile(&job)
+                } else {
+                    job.run()
+                }
+            }
+            Err(e) => Err(e),
         }
+    };
+
+    if let Err(e) = result {
+        error!("Error: {}", e);
+        process::exit(1);
     }
 }
