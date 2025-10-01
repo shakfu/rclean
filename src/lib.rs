@@ -311,7 +311,9 @@ impl CleaningJob {
             // Check if path matches exclude patterns
             if let Some(ref exclude) = exclude_set {
                 if exclude.is_match(entry_path) {
-                    info!("Excluded: {:?}", entry_path.display());
+                    if !self.show_progress {
+                        info!("Excluded: {:?}", entry_path.display());
+                    }
                     continue;
                 }
             }
@@ -383,10 +385,14 @@ impl CleaningJob {
         // Either delete immediately or add to targets
         if self.skip_confirmation && !self.dry_run {
             self.remove_entry(entry);
-            info!("Deleted: {:?}", entry_path.display());
+            if !self.show_progress {
+                info!("Deleted: {:?}", entry_path.display());
+            }
         } else {
             self.targets.push((entry_path.to_path_buf(), metadata));
-            info!("Matched: {:?}", entry_path.display());
+            if !self.show_progress {
+                info!("Matched: {:?}", entry_path.display());
+            }
         }
 
         Ok(())
@@ -419,19 +425,21 @@ impl CleaningJob {
             return;
         }
 
-        info!("\n=== Statistics ===");
-        let mut patterns: Vec<_> = self.stats.iter().collect();
-        patterns.sort_by(|a, b| b.1.0.cmp(&a.1.0)); // Sort by count descending
+        if !self.show_progress {
+            info!("\n=== Statistics ===");
+            let mut patterns: Vec<_> = self.stats.iter().collect();
+            patterns.sort_by(|a, b| b.1.0.cmp(&a.1.0)); // Sort by count descending
 
-        for (pattern, (count, size)) in patterns {
-            info!(
-                "  {}: {} item(s), {:.2} MB",
-                pattern,
-                count,
-                (*size as f64) / 1000000.
-            );
+            for (pattern, (count, size)) in patterns {
+                info!(
+                    "  {}: {} item(s), {:.2} MB",
+                    pattern,
+                    count,
+                    (*size as f64) / 1000000.
+                );
+            }
+            info!("==================\n");
         }
-        info!("==================\n");
     }
 
     /// remove collected targets (kept for compatibility)
