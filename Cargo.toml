@@ -7,10 +7,10 @@ description = "Safely remove files and directories matching a set of glob patter
 readme = "README.md"
 homepage = "https://github.com/shakfu/rclean"
 repository = "https://github.com/shakfu/rclean"
-license-file = "LICENSE"
+license = "MIT"
 keywords = ["clean", "delete", "cleanup", "filesystem", "glob"]
 categories = ["command-line-utilities"]
-include = ["/src", "Cargo.toml", "LICENSE", "README.md"]
+include = ["/src", "/tests", "Cargo.toml", "LICENSE", "README.md"]
 
 [dependencies]
 clap = { version = "4.5.40", features = ["derive"] }

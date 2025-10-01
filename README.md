@@ -180,4 +180,4 @@ All tests use `tempfile` for safe temporary directory creation.
 
 ## License
 
-MIT
+Unlicense (Public Domain)
