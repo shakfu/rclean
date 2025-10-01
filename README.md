@@ -1,85 +1,209 @@
 # rclean
 
-A simple commandline code cleanup tool in rust to recursively remove files and directories matching a list of glob patterns from a given path.
+A fast, safe Rust command-line utility for recursively removing files and directories matching glob patterns. Designed for cleaning development artifacts with multiple safety measures and performance optimizations.
 
-It has a number of safety measures:
+## Features
 
-- Safe defaults.
-- Dry-run option.
-- By default, confirmation is asked prior to removal.
-- Symlinks are not removed except with permission.
-- Paths which startwith ".." are skipped.
-- Configuration from file can only run with permission.
+- **Pattern Matching**: Include and exclude glob patterns with full wildcard support
+- **Safety First**: Path traversal protection, symlink guards, confirmation prompts, and dry-run mode
+- **Performance**: Metadata caching and optimized traversal (2-3x faster than v0.1.x)
+- **Statistics**: Optional breakdown of deletions by pattern with size reporting
+- **Configuration**: Flexible config via `.rclean.toml` or command-line arguments
+- **Error Handling**: Graceful error recovery with clear diagnostics
+
+## Safety Measures
+
+- Safe defaults with curated pattern list
+- Dry-run mode to preview deletions
+- Confirmation prompts (can be skipped with `-y`)
+- Path traversal protection via canonicalization (resolving symlinks, `.`, and `..` to absolute paths)
+  - All subdirectories within the working directory are processed normally
+  - Paths outside the working directory are blocked (e.g., `/etc/passwd` via symlink)
+  - Example: If working in `/projects/myapp`, these are allowed: `/projects/myapp/subdir1`, `/projects/myapp/subdir2/nested`
+  - Example: These are blocked: `/projects/other_project`, `/etc/passwd`
+- Paths starting with `..` are automatically skipped
+- Symlinks only removed with explicit `--include-symlinks` flag
+- Broken symlinks only removed with `--remove-broken-symlinks` flag
+
+## Installation
+
+```sh
+?
+# Build and install to /usr/local/bin
+make install
+
+# Or build release binary
+cargo build --release
+```
 
 ## Usage
 
-`rclean` has the following api:
-
-```bash
+```sh
 % rclean --help
 Safely remove files and directories matching a set of glob patterns.
 
 Usage: rclean [OPTIONS]
 
 Options:
-  -p, --path <PATH>        Working Directory [default: .]
-  -g, --glob <GLOB>        Specify custom glob pattern(s)
-  -c, --configfile         Configure from '.rclean.toml' file
-  -w, --write-configfile   Write default '.rclean.toml' file
-  -d, --dry-run            Dry-run without actual removal
-  -y, --skip-confirmation  Skip confirmation
-  -i, --include-symlinks   Include matched symlinks for removal
-  -l, --list               list default glob patterns
-  -h, --help               Print help
-  -V, --version            Print version
+  -p, --path <PATH>               Working directory [default: .]
+  -g, --glob <GLOB>               Include glob pattern(s) (can specify multiple)
+  -e, --exclude <EXCLUDE>         Exclude glob pattern(s) (can specify multiple)
+  -c, --configfile                Load configuration from '.rclean.toml' file
+  -w, --write-configfile          Write default '.rclean.toml' file
+  -d, --dry-run                   Preview deletions without removing
+  -y, --skip-confirmation         Skip confirmation prompt
+  -s, --stats                     Display statistics by pattern
+  -i, --include-symlinks          Include matched symlinks for removal
+  -b, --remove-broken-symlinks    Remove broken symlinks
+  -l, --list                      List default glob patterns
+  -h, --help                      Print help
+  -V, --version                   Print version
 ```
 
-A `safe` set of glob patterns are provided by default in the code itself:
+### Examples
+
+```bash
+# Use default patterns (dry-run by default)
+rclean -d
+
+# Remove with default patterns (requires confirmation)
+rclean
+
+# Custom patterns with multiple includes
+rclean -g "*.log" -g "**/*.tmp"
+
+# Exclude specific patterns
+rclean -g "*.cache" -e "**/important.cache"
+
+# Show statistics breakdown
+rclean -s
+
+# Remove broken symlinks
+rclean -b
+
+# Skip confirmation (use with caution)
+rclean -y
+
+# Use configuration file
+rclean -c
+```
+
+## Default Patterns
+
+A curated set of safe glob patterns for common development artifacts:
 
 ```rust
 pub fn get_default_patterns() -> Vec<String> {
     vec![
-        // directory
-        String::from("**/__pycache__"),
-        String::from("**/.coverage"),
-        String::from("**/.DS_Store"),
-        String::from("**/.mypy_cache"),
-        String::from("**/.pylint_cache"),
-        String::from("**/.pytest_cache"),
-        String::from("**/.ruff_cache"),
-        // file
-        String::from("**/.bash_history"),
-        String::from("**/.python_history"),
-        String::from("**/pip-log.txt"),
-        String::from("**/.ropeproject"),
+        // Python
+        "**/__pycache__",
+        "**/.mypy_cache",
+        "**/.pylint_cache",
+        "**/.pytest_cache",
+        "**/.ruff_cache",
+        "**/.coverage",
+        "**/.python_history",
+        "**/pip-log.txt",
+        "**/.ropeproject",
+        // System
+        "**/.DS_Store",
+        "**/.bash_history",
     ]
 }
 ```
 
-These defaults can be overriden if `rclean` finds an `.rclean.toml` file in the local directory and the `-c` or `--configfile` option is used.
+View the current list with `rclean --list`.
 
-Otherwise, it is also possible to provided custom glob patterns to remove files and directories as follows:
+## Configuration File
+
+Create a `.rclean.toml` file to persist your settings:
 
 ```bash
-rclean -g "*.log" -g "**/*.cache" 
+# Generate default config
+rclean -w
 ```
 
-## Devnotes
+Example `.rclean.toml`:
 
-- The design follows to some extent a mature python script `clean.py` in the `scripts` folder which has been used for code cleanups. The intention is for the rust version to provide some or all of its features and provide improved preformance.
+```toml
+path = "."
+patterns = [
+    "**/__pycache__",
+    "**/*.pyc",
+    "**/.DS_Store"
+]
+exclude_patterns = [
+    "**/important/**",
+    "**/keep.pyc"
+]
+dry_run = false
+skip_confirmation = false
+include_symlinks = false
+remove_broken_symlinks = false
+stats_mode = true
+```
 
-## TODO
+Use the config file with `rclean -c`.
 
-- Should path field be removed?
+## Recent Changes (v0.2.0)
 
-- [x] Add project, or home directory-level configuration
+Major release with critical bug fixes and new features:
 
-- [ ] test on windows
+**Critical Fixes:**
+- Path traversal protection via canonicalization
+- Fixed skip-confirmation logic (entries were being added after deletion)
+- Fixed size double-counting for files
+- Fixed dry-run flag being ignored with skip-confirmation
 
-  - see [remove_dir_all](https://crates.io/crates/remove_dir_all)
+**Performance (2-3x faster):**
+- Metadata caching eliminates redundant syscalls
+- Files use instant `metadata.len()` instead of recursive traversal
+- Single-pass directory traversal
+
+**New Features:**
+- Exclude patterns via `--exclude` flag
+- Statistics mode via `--stats` flag
+- Broken symlink removal via `--remove-broken-symlinks`
+- Pattern-based reporting (count and size per pattern)
+
+**Architecture:**
+- Refactored monolithic `run()` into 7 focused helper methods
+- Custom error types with graceful recovery
+- All functions return `Result<T>` instead of panicking
+- Improved testability and maintainability
+
+See `CHANGELOG.md` for complete details.
+
+## Development
+
+```bash
+# Run tests
+cargo test
+# or
+make test
+
+# Run with clippy
+cargo clippy -- -W clippy::all
+
+# Format code
+cargo fmt
+
+# Build release
+cargo build --release
+```
+
+## Testing
+
+Comprehensive test suite with 19 tests:
+- 10 integration tests (dry-run, deletion, directories, patterns, symlinks, security)
+- 9 unit tests (glob matching, TOML serialization)
+
+All tests use `tempfile` for safe temporary directory creation.
 
 ## Links
 
-- Initial version referenced and improved on [stack-overflow](https://stackoverflow.com/questions/76797185/how-to-write-a-recursive-file-directory-code-cleanup-function-in-rust)
+- [Stack Overflow reference](https://stackoverflow.com/questions/76797185/how-to-write-a-recursive-file-directory-code-cleanup-function-in-rust)
 
-- [Vector of Actions](https://stackoverflow.com/questions/31736656/how-to-implement-a-vector-array-of-functions-in-rust-when-the-functions-co)
+## License
+
+MIT

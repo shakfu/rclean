@@ -21,9 +21,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 - **Progress Bar**: New `--progress` (`-P`) flag to show real-time scanning progress
   - Displays elapsed time and items scanned
-  - Updates every 100 items for efficiency
+  - Updates every 100 items for efficiency, and doesn't display INFO log
   - Shows final summary on completion
-  - Uses indicatif crate for smooth spinner animation
+  - Uses `indicatif` crate for smooth spinner animation
 
 - **Age-Based Filtering**: New `--older-than` (`-o`) flag to only remove old files
   - Example: `rclean -g "*.log" --older-than "30d"`
