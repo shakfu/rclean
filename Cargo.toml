@@ -1,6 +1,6 @@
 [package]
 name = "rclean"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 authors = ["Shakeeb Alireza"]
 description = "Safely remove files and directories matching a set of glob patterns."

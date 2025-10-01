@@ -15,6 +15,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ---
 
+## [0.2.1]
+
+### Changed
+
+- **Config File Path**: `--configfile` (`-c`) now accepts optional path argument
+  - `-c` alone uses default `.rclean.toml`
+  - `-c path/to/config.toml` uses specified config file
+  - Provides flexibility for multiple config files or non-standard locations
+
+---
+
 ## [0.2.0]
 
 ### Added

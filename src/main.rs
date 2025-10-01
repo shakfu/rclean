@@ -29,9 +29,9 @@ struct Args {
     #[arg(short, long)]
     exclude: Option<Vec<String>>,
 
-    /// Configure from '.rclean.toml' file
-    #[arg(short, long)]
-    configfile: bool,
+    /// Configure from config file (defaults to '.rclean.toml' if no path specified)
+    #[arg(short, long, value_name = "PATH")]
+    configfile: Option<String>,
 
     /// Write default '.rclean.toml' file
     #[arg(short, long)]
@@ -146,21 +146,23 @@ fn write_configfile(job: &CleaningJob) -> Result<()> {
     }
 }
 
-/// run cleanup job using configuration from '.rclean.toml' file
+/// run cleanup job using configuration from config file
 ///
 /// # Errors
 ///
 /// This function will return an error if the file cannot be read.
-fn run_job_from_configfile() -> Result<()> {
-    let settings_file = Path::new(SETTINGS_FILENAME);
+fn run_job_from_configfile(config_path: Option<String>) -> Result<()> {
+    let config_file = config_path.as_deref().unwrap_or(SETTINGS_FILENAME);
+    let settings_file = Path::new(config_file);
+
     if !settings_file.exists() {
         return Err(rclean::CleanError::ConfigError(
-            format!("Settings file '{SETTINGS_FILENAME}' not found")
+            format!("Settings file '{}' not found", config_file)
         ));
     }
 
-    info!("using settings file: {SETTINGS_FILENAME:?}");
-    let contents = fs::read_to_string(SETTINGS_FILENAME)?;
+    info!("using settings file: {config_file:?}");
+    let contents = fs::read_to_string(config_file)?;
     let mut job: CleaningJob = toml::from_str(&contents)
         .map_err(|e| rclean::CleanError::ConfigError(format!("Cannot deserialize from .toml: {}", e)))?;
 
@@ -172,8 +174,8 @@ fn main() {
     init_logging();
     let args = Args::parse();
 
-    let result = if args.configfile {
-        run_job_from_configfile()
+    let result = if args.configfile.is_some() {
+        run_job_from_configfile(args.configfile)
     } else if args.list {
         info!("default patterns: {:?}", get_default_patterns());
         Ok(())

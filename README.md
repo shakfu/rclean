@@ -48,7 +48,7 @@ Options:
   -p, --path <PATH>               Working directory [default: .]
   -g, --glob <GLOB>               Include glob pattern(s) (can specify multiple)
   -e, --exclude <EXCLUDE>         Exclude glob pattern(s) (can specify multiple)
-  -c, --configfile                Load configuration from '.rclean.toml' file
+  -c, --configfile <PATH>         Load configuration from file (defaults to '.rclean.toml')
   -w, --write-configfile          Write default '.rclean.toml' file
   -d, --dry-run                   Preview deletions without removing
   -y, --skip-confirmation         Skip confirmation prompt
@@ -84,8 +84,11 @@ rclean -b
 # Skip confirmation (use with caution)
 rclean -y
 
-# Use configuration file
+# Use default config file (.rclean.toml)
 rclean -c
+
+# Use custom config file path
+rclean -c configs/my-cleanup.toml
 ```
 
 ## Default Patterns
@@ -144,35 +147,6 @@ stats_mode = true
 ```
 
 Use the config file with `rclean -c`.
-
-## Recent Changes (v0.2.0)
-
-Major release with critical bug fixes and new features:
-
-**Critical Fixes:**
-- Path traversal protection via canonicalization
-- Fixed skip-confirmation logic (entries were being added after deletion)
-- Fixed size double-counting for files
-- Fixed dry-run flag being ignored with skip-confirmation
-
-**Performance (2-3x faster):**
-- Metadata caching eliminates redundant syscalls
-- Files use instant `metadata.len()` instead of recursive traversal
-- Single-pass directory traversal
-
-**New Features:**
-- Exclude patterns via `--exclude` flag
-- Statistics mode via `--stats` flag
-- Broken symlink removal via `--remove-broken-symlinks`
-- Pattern-based reporting (count and size per pattern)
-
-**Architecture:**
-- Refactored monolithic `run()` into 7 focused helper methods
-- Custom error types with graceful recovery
-- All functions return `Result<T>` instead of panicking
-- Improved testability and maintainability
-
-See `CHANGELOG.md` for complete details.
 
 ## Development
 
