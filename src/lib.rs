@@ -216,8 +216,8 @@ impl CleaningJob {
         Ok((include_set, exclude_set))
     }
 
-    /// Check if path should be processed
-    fn should_process(&self, entry_path: &Path, base_path: &Path) -> bool {
+    /// Check if path should be processed (basic filtering only)
+    fn should_process(&self, entry_path: &Path) -> bool {
         let current_path = Path::new(".");
         let parent_path = Path::new("..");
 
@@ -232,10 +232,27 @@ impl CleaningJob {
             return false;
         }
 
+        true
+    }
+
+    /// Security check: verify path is within base directory
+    /// For symlinks, we skip canonicalization since symlinks are already
+    /// protected by the include_symlinks flag
+    fn is_path_safe(&self, entry_path: &Path, base_path: &Path, is_symlink: bool) -> bool {
+        // Skip canonicalization for symlinks - they're protected by include_symlinks flag
+        // Canonicalizing symlinks follows them to their target, which may be outside
+        // the working directory even though the symlink itself is inside
+        if is_symlink {
+            return true;
+        }
+
         // Security check: Verify path is within base directory
         if let Ok(canonical) = entry_path.canonicalize() {
             if !canonical.starts_with(base_path) {
-                warn!("Skipping path outside working directory: {:?}", entry_path.display());
+                warn!(
+                    "Skipping path outside working directory: {:?}",
+                    entry_path.display()
+                );
                 return false;
             }
         }
@@ -287,11 +304,15 @@ impl CleaningJob {
             if let Some(ref pb) = progress {
                 processed += 1;
                 if processed.is_multiple_of(100) {
-                    pb.set_message(format!("Scanned {} items, found {} matches", processed, self.counter));
+                    pb.set_message(format!(
+                        "Scanned {} items, found {} matches",
+                        processed, self.counter
+                    ));
                 }
             }
 
-            if !self.should_process(entry_path, base_path) {
+            // Basic path filtering (skip ".", "..", paths starting with "..")
+            if !self.should_process(entry_path) {
                 continue;
             }
 
@@ -318,13 +339,23 @@ impl CleaningJob {
                 }
             }
 
+            // Determine if entry is a symlink
+            let is_symlink = entry.path_is_symlink();
+
             // Skip symlinks unless explicitly included
-            if entry.path_is_symlink() && !self.include_symlinks {
+            if is_symlink && !self.include_symlinks {
+                continue;
+            }
+
+            // Security check: verify path is within base directory
+            // Only warn for paths that match patterns (to avoid noisy output)
+            if !self.is_path_safe(entry_path, base_path, is_symlink) {
                 continue;
             }
 
             // Find matching pattern for statistics
-            let pattern = self.find_matching_pattern(entry_path)
+            let pattern = self
+                .find_matching_pattern(entry_path)
                 .unwrap_or_else(|| "unknown".to_string());
 
             self.handle_matched_entry(&entry, pattern)?;
