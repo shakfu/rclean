@@ -1,0 +1,36 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "rclean"
+version = "0.2.1"
+description = "Safe file/directory removal with glob patterns"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Shakeeb Alireza" }]
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Filesystems",
+    "Topic :: Utilities",
+]
+keywords = ["clean", "delete", "cleanup", "filesystem", "glob"]
+
+[project.urls]
+Homepage = "https://github.com/shakfu/rclean"
+Repository = "https://github.com/shakfu/rclean"
+
+[tool.maturin]
+features = ["python"]
+module-name = "rclean"

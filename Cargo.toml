@@ -12,7 +12,17 @@ keywords = ["clean", "delete", "cleanup", "filesystem", "glob"]
 categories = ["command-line-utilities"]
 include = ["/src", "/tests", "Cargo.toml", "LICENSE", "README.md"]
 
+[lib]
+name = "rclean"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+python = ["pyo3", "pyo3-log"]
+
 [dependencies]
+pyo3 = { version = "0.27", optional = true }
+pyo3-log = { version = "0.13", optional = true }
 clap = { version = "4.5.40", features = ["derive"] }
 dialoguer = "0.11.0"
 fs_extra = "1.3.0"

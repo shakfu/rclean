@@ -13,6 +13,11 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 use walkdir::WalkDir;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+#[cfg(feature = "python")]
+use pyo3::exceptions::PyRuntimeError;
+
 // --------------------------------------------------------------------
 // error types
 
@@ -60,6 +65,7 @@ pub type Result<T> = std::result::Result<T, CleanError>;
 /// Main configuration object for cleaning jobs with partial
 /// with selective (de)serialization
 #[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "python", pyclass)]
 pub struct CleaningJob {
     pub path: String,
     pub patterns: Vec<String>,
@@ -510,4 +516,179 @@ impl CleaningJob {
 
         self.remove_path(p, &target);
     }
+}
+
+// --------------------------------------------------------------------
+// Python bindings
+
+#[cfg(feature = "python")]
+#[pymethods]
+impl CleaningJob {
+    /// Python constructor with keyword arguments
+    #[new]
+    #[pyo3(signature = (
+        path = String::from("."),
+        patterns = vec![],
+        exclude_patterns = vec![],
+        dry_run = true,
+        include_symlinks = false,
+        remove_broken_symlinks = false,
+        stats_mode = false,
+        older_than_secs = None,
+    ))]
+    fn py_new(
+        path: String,
+        patterns: Vec<String>,
+        exclude_patterns: Vec<String>,
+        dry_run: bool,
+        include_symlinks: bool,
+        remove_broken_symlinks: bool,
+        stats_mode: bool,
+        older_than_secs: Option<u64>,
+    ) -> Self {
+        Self::new(
+            path,
+            patterns,
+            exclude_patterns,
+            dry_run,
+            true,  // skip_confirmation: always true for Python
+            include_symlinks,
+            remove_broken_symlinks,
+            stats_mode,
+            older_than_secs,
+            false, // show_progress: always false for Python
+        )
+    }
+
+    /// Run the cleaning job (non-interactive)
+    #[pyo3(name = "run")]
+    fn py_run(&mut self) -> PyResult<()> {
+        // Ensure non-interactive mode for Python
+        self.skip_confirmation = true;
+        self.show_progress = false;
+        self.run().map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+
+    // Getters for configuration fields
+    #[getter]
+    fn get_path(&self) -> &str {
+        &self.path
+    }
+
+    #[setter]
+    fn set_path(&mut self, value: String) {
+        self.path = value;
+    }
+
+    #[getter]
+    fn get_patterns(&self) -> Vec<String> {
+        self.patterns.clone()
+    }
+
+    #[setter]
+    fn set_patterns(&mut self, value: Vec<String>) {
+        self.patterns = value;
+    }
+
+    #[getter]
+    fn get_exclude_patterns(&self) -> Vec<String> {
+        self.exclude_patterns.clone()
+    }
+
+    #[setter]
+    fn set_exclude_patterns(&mut self, value: Vec<String>) {
+        self.exclude_patterns = value;
+    }
+
+    #[getter]
+    fn get_dry_run(&self) -> bool {
+        self.dry_run
+    }
+
+    #[setter]
+    fn set_dry_run(&mut self, value: bool) {
+        self.dry_run = value;
+    }
+
+    #[getter]
+    fn get_include_symlinks(&self) -> bool {
+        self.include_symlinks
+    }
+
+    #[setter]
+    fn set_include_symlinks(&mut self, value: bool) {
+        self.include_symlinks = value;
+    }
+
+    #[getter]
+    fn get_remove_broken_symlinks(&self) -> bool {
+        self.remove_broken_symlinks
+    }
+
+    #[setter]
+    fn set_remove_broken_symlinks(&mut self, value: bool) {
+        self.remove_broken_symlinks = value;
+    }
+
+    #[getter]
+    fn get_stats_mode(&self) -> bool {
+        self.stats_mode
+    }
+
+    #[setter]
+    fn set_stats_mode(&mut self, value: bool) {
+        self.stats_mode = value;
+    }
+
+    #[getter]
+    fn get_older_than_secs(&self) -> Option<u64> {
+        self.older_than_secs
+    }
+
+    #[setter]
+    fn set_older_than_secs(&mut self, value: Option<u64>) {
+        self.older_than_secs = value;
+    }
+
+    // Getters for runtime fields (read-only)
+    #[getter]
+    fn get_size(&self) -> u64 {
+        self.size
+    }
+
+    #[getter]
+    fn get_counter(&self) -> i32 {
+        self.counter
+    }
+
+    #[getter]
+    fn get_stats(&self) -> HashMap<String, (i32, u64)> {
+        self.stats.clone()
+    }
+
+    #[getter]
+    fn get_failed_deletions(&self) -> Vec<(String, String)> {
+        self.failed_deletions
+            .iter()
+            .map(|(p, e)| (p.display().to_string(), e.clone()))
+            .collect()
+    }
+}
+
+/// Python module definition
+#[cfg(feature = "python")]
+#[pymodule]
+fn rclean(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    pyo3_log::init();
+    m.add_class::<CleaningJob>()?;
+    m.add_function(wrap_pyfunction!(py_get_default_patterns, m)?)?;
+    m.add("SETTINGS_FILENAME", constants::SETTINGS_FILENAME)?;
+    Ok(())
+}
+
+/// Get default cleaning patterns (Python wrapper)
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_get_default_patterns() -> Vec<String> {
+    constants::get_default_patterns()
 }
