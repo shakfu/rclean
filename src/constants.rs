@@ -13,6 +13,8 @@ pub fn get_default_patterns() -> Vec<String> {
         String::from("**/.pylint_cache"),
         String::from("**/.pytest_cache"),
         String::from("**/.ruff_cache"),
+        String::from("**/.rumdl_cache"),
+        String::from("**/.pyscn"),
         // file
         String::from("**/.bash_history"),
         String::from("**/.python_history"),
