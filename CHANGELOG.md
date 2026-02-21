@@ -17,12 +17,93 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.2.1]
 
+### Added
+
+- **Builder Pattern**: `CleanConfig::builder()` fluent API replaces direct struct construction
+  - All fields configurable via chained methods (e.g., `.path(".")..dry_run(true).build()`)
+  - Eliminates need for `#[allow(clippy::too_many_arguments)]`
+
+- **Config Discovery**: `rclean -c` (without a path) now searches for config automatically
+  - Searches upward from the current directory for `.rclean.toml`
+  - Falls back to global config at `~/.config/rclean/config.toml`
+  - Explicit path still supported: `rclean -c path/to/config.toml`
+  - New public functions: `find_config_upward()`, `global_config_path()`, `discover_config()`
+
+- **CLI Flag Overrides**: When using `-c`, CLI flags now override config file values
+  - `--dry-run`, `--stats`, `--progress`, `--exclude`, `--older-than`, etc.
+  - Example: `rclean -c --dry-run` forces dry-run even if config says `dry_run = false`
+
+- **Pattern Presets**: Named pattern groups via `--preset` flag
+  - Available presets: `common`, `python`, `node`, `rust`, `java`, `c`, `go`, `all`
+  - Combinable: `--preset python --preset node`
+  - Combinable with custom patterns: `--preset python -g "**/*.log"`
+  - List preset contents: `rclean -l --preset python`
+
+- **JSON Output**: `--format json` for machine-readable structured output
+  - Includes `matches`, `summary`, `stats`, and `failures` sections
+  - Human-readable sizes in summary and stats
+  - Suppresses text logging when active
+
+- **Shell Completions**: `--completions <SHELL>` generates completions
+  - Supports bash, zsh, fish, elvish, powershell
+  - Uses `clap_complete` crate
+
+- **Human-Readable Sizes**: All size output now uses IEC binary units
+  - Format: B, KiB, MiB, GiB, TiB
+  - Applied to statistics, summary, and JSON output
+  - Public `format_size()` function available in library API
+
+- **Verbose/Quiet Modes**: `--verbose` (`-v`) and `--quiet` (`-q`) flags
+  - Verbose enables debug-level logging
+  - Quiet suppresses all output except errors
+
+- **New Dependencies**: `clap_complete`, `serde_json`, `dirs`
+
+- **New Tests** (54 total, up from 19):
+  - 7 config discovery tests (upward search, global fallback, edge cases)
+  - 5 size formatting tests (B through TiB)
+  - 10 duration parsing tests (all units, edge cases)
+  - 9 preset resolution tests (all presets, deduplication, unknown handling)
+  - 2 JSON output tests (structure, empty results)
+  - 2 age-based filtering integration tests
+
 ### Changed
 
+- **Architecture**: Split `CleaningJob` into `CleanConfig` (serializable) + `CleaningJob` (runtime)
+  - `CleanConfig` holds all configuration with serde support
+  - `CleaningJob` holds runtime state (targets, stats, counters)
+  - Clean separation of concerns
+
+- **Pre-compiled Matchers**: Glob patterns compiled once in `build_globsets()`
+  - `PatternMatchers` type alias: `Vec<(String, GlobMatcher)>`
+  - Eliminates per-entry glob recompilation for stats attribution
+
+- **Progress Bar + Output**: Progress bar no longer suppresses `--stats` or match logging
+  - Uses `pb.println()` to interleave output with spinner
+  - All match/exclude/delete messages route through progress-aware logging
+
+- **Counter Type**: Changed `counter` from `i32` to `usize`, stats values from `(i32, u64)` to `(usize, u64)`
+
+- **Memory**: `execute_deletion()` uses `std::mem::take` instead of `.clone()` for targets
+
 - **Config File Path**: `--configfile` (`-c`) now accepts optional path argument
-  - `-c` alone uses default `.rclean.toml`
+  - `-c` alone triggers config discovery
   - `-c path/to/config.toml` uses specified config file
-  - Provides flexibility for multiple config files or non-standard locations
+
+- **Non-Zero Exit Code**: Process exits with code 1 when any deletions fail
+
+- **Default Patterns**: Now defined as `common` + `python` presets combined (deduplicated)
+
+### Fixed
+
+- **Dry-run Default Confusion**: `CleanConfig::default()` now sets `dry_run = false`
+  - Previously inconsistent between Default impl and CLI behavior
+  - CLI `-d` flag still works as expected for explicit dry-run
+
+- **License Contradiction**: Fixed README stating "Unlicense" while Cargo.toml and LICENSE file specified MIT
+  - README now correctly states MIT
+
+- **Makefile**: Added `test` target (`cargo test`)
 
 ---
 
@@ -117,7 +198,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - **Duplicate Code**: Optimized `remove_entry()` to eliminate duplicate removal logic
   - Combined file and symlink removal (both use `remove_file()`)
 
-- **Typo**: Fixed "deerialize" → "deserialize" in error message
+- **Typo**: Fixed "deerialize" -> "deserialize" in error message
 
 ### Security
 
@@ -130,13 +211,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - **Config File Safety**: Improved validation of `.rclean.toml` contents
   - Better error messages for malformed configs
   - Pattern validation before execution
-
-### Statistics
-
-- Total tests: 19 (10 integration + 9 unit tests)
-- All tests passing with zero warnings
-- Zero clippy warnings
-- Estimated 2-3x performance improvement for large directory trees
 
 ---
 

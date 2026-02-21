@@ -1,5 +1,6 @@
-use rclean::CleaningJob;
+use rclean::{CleanConfig, CleaningJob};
 use std::fs;
+use std::time::{Duration, SystemTime};
 use tempfile::TempDir;
 
 /// Helper function to create a temporary directory structure for testing
@@ -31,19 +32,13 @@ fn test_dry_run_does_not_delete() {
     let temp_dir = create_test_structure();
     let base_path = temp_dir.path().to_str().unwrap().to_string();
 
-    let mut job = CleaningJob::new(
-        base_path.clone(),
-        vec!["**/*.pyc".to_string()],
-        vec![],  // exclude_patterns
-        true,  // dry_run
-        true,  // skip_confirmation
-        false, // include_symlinks
-        false, // remove_broken_symlinks
-        false, // stats_mode
-        None,  // older_than_secs
-        false, // show_progress
-    );
-
+    let config = CleanConfig::builder()
+        .path(base_path)
+        .patterns(vec!["**/*.pyc".to_string()])
+        .dry_run(true)
+        .skip_confirmation(true)
+        .build();
+    let mut job = CleaningJob::new(config);
     job.run().unwrap();
 
     // Files should still exist in dry-run mode
@@ -56,19 +51,12 @@ fn test_actual_file_deletion() {
     let temp_dir = create_test_structure();
     let base_path = temp_dir.path().to_str().unwrap().to_string();
 
-    let mut job = CleaningJob::new(
-        base_path.clone(),
-        vec!["**/*.pyc".to_string()],
-        vec![],  // exclude_patterns
-        false, // not dry_run
-        true,  // skip_confirmation
-        false, // include_symlinks
-        false, // remove_broken_symlinks
-        false, // stats_mode
-        None,  // older_than_secs
-        false, // show_progress
-    );
-
+    let config = CleanConfig::builder()
+        .path(base_path)
+        .patterns(vec!["**/*.pyc".to_string()])
+        .skip_confirmation(true)
+        .build();
+    let mut job = CleaningJob::new(config);
     job.run().unwrap();
 
     // .pyc files should be deleted
@@ -85,19 +73,12 @@ fn test_directory_deletion() {
     let temp_dir = create_test_structure();
     let base_path = temp_dir.path().to_str().unwrap().to_string();
 
-    let mut job = CleaningJob::new(
-        base_path.clone(),
-        vec!["**/__pycache__".to_string()],
-        vec![],  // exclude_patterns
-        false, // not dry_run
-        true,  // skip_confirmation
-        false, // include_symlinks
-        false, // remove_broken_symlinks
-        false, // stats_mode
-        None,  // older_than_secs
-        false, // show_progress
-    );
-
+    let config = CleanConfig::builder()
+        .path(base_path)
+        .patterns(vec!["**/__pycache__".to_string()])
+        .skip_confirmation(true)
+        .build();
+    let mut job = CleaningJob::new(config);
     job.run().unwrap();
 
     // __pycache__ directory should be deleted entirely
@@ -113,19 +94,15 @@ fn test_multiple_patterns() {
     let temp_dir = create_test_structure();
     let base_path = temp_dir.path().to_str().unwrap().to_string();
 
-    let mut job = CleaningJob::new(
-        base_path.clone(),
-        vec!["**/*.pyc".to_string(), "**/__pycache__".to_string()],
-        vec![],  // exclude_patterns
-        false, // not dry_run
-        true,  // skip_confirmation
-        false, // include_symlinks
-        false, // remove_broken_symlinks
-        false, // stats_mode
-        None,  // older_than_secs
-        false, // show_progress
-    );
-
+    let config = CleanConfig::builder()
+        .path(base_path)
+        .patterns(vec![
+            "**/*.pyc".to_string(),
+            "**/__pycache__".to_string(),
+        ])
+        .skip_confirmation(true)
+        .build();
+    let mut job = CleaningJob::new(config);
     job.run().unwrap();
 
     // Both .pyc files and __pycache__ directory should be deleted
@@ -159,19 +136,12 @@ fn test_broken_symlink_removal() {
 
     let base_path = base.to_str().unwrap().to_string();
 
-    let mut job = CleaningJob::new(
-        base_path,
-        vec![],
-        vec![],  // exclude_patterns
-        false, // not dry_run
-        true,  // skip_confirmation
-        false, // include_symlinks
-        true,  // remove_broken_symlinks
-        false, // stats_mode
-        None,  // older_than_secs
-        false, // show_progress
-    );
-
+    let config = CleanConfig::builder()
+        .path(base_path)
+        .remove_broken_symlinks(true)
+        .skip_confirmation(true)
+        .build();
+    let mut job = CleaningJob::new(config);
     job.run().unwrap();
 
     // Broken symlink should be removed
@@ -183,18 +153,12 @@ fn test_invalid_pattern_returns_error() {
     let temp_dir = TempDir::new().unwrap();
     let base_path = temp_dir.path().to_str().unwrap().to_string();
 
-    let mut job = CleaningJob::new(
-        base_path,
-        vec!["[invalid".to_string()], // Invalid glob pattern
-        vec![],  // exclude_patterns
-        false, // not dry_run
-        true,  // skip_confirmation
-        false, // include_symlinks
-        false, // remove_broken_symlinks
-        false, // stats_mode
-        None,  // older_than_secs
-        false, // show_progress
-    );
+    let config = CleanConfig::builder()
+        .path(base_path)
+        .patterns(vec!["[invalid".to_string()])
+        .skip_confirmation(true)
+        .build();
+    let mut job = CleaningJob::new(config);
 
     let result = job.run();
     assert!(result.is_err());
@@ -205,19 +169,13 @@ fn test_size_calculation() {
     let temp_dir = create_test_structure();
     let base_path = temp_dir.path().to_str().unwrap().to_string();
 
-    let mut job = CleaningJob::new(
-        base_path,
-        vec!["**/*.pyc".to_string()],
-        vec![],  // exclude_patterns
-        true,  // dry_run to check size without deleting
-        true,  // skip_confirmation
-        false, // include_symlinks
-        false, // remove_broken_symlinks
-        false, // stats_mode
-        None,  // older_than_secs
-        false, // show_progress
-    );
-
+    let config = CleanConfig::builder()
+        .path(base_path)
+        .patterns(vec!["**/*.pyc".to_string()])
+        .dry_run(true)
+        .skip_confirmation(true)
+        .build();
+    let mut job = CleaningJob::new(config);
     job.run().unwrap();
 
     // Size should be greater than 0 since we have .pyc files
@@ -239,18 +197,12 @@ fn test_path_traversal_protection() {
     // Try to use a pattern that would match outside the base directory
     let base_path = base.to_str().unwrap().to_string();
 
-    let mut job = CleaningJob::new(
-        base_path,
-        vec!["../../*.txt".to_string()],
-        vec![],  // exclude_patterns
-        false, // not dry_run
-        true,  // skip_confirmation
-        false, // include_symlinks
-        false, // remove_broken_symlinks
-        false, // stats_mode
-        None,  // older_than_secs
-        false, // show_progress
-    );
+    let config = CleanConfig::builder()
+        .path(base_path)
+        .patterns(vec!["../../*.txt".to_string()])
+        .skip_confirmation(true)
+        .build();
+    let mut job = CleaningJob::new(config);
 
     // Run should succeed but not delete files outside base directory
     job.run().unwrap();
@@ -267,19 +219,13 @@ fn test_exclude_patterns() {
     let temp_dir = create_test_structure();
     let base_path = temp_dir.path().to_str().unwrap().to_string();
 
-    let mut job = CleaningJob::new(
-        base_path.clone(),
-        vec!["**/*.pyc".to_string()],
-        vec!["**/subdir/*.pyc".to_string()],  // exclude subdir .pyc files
-        false, // not dry_run
-        true,  // skip_confirmation
-        false, // include_symlinks
-        false, // remove_broken_symlinks
-        false, // stats_mode
-        None,  // older_than_secs
-        false, // show_progress
-    );
-
+    let config = CleanConfig::builder()
+        .path(base_path)
+        .patterns(vec!["**/*.pyc".to_string()])
+        .exclude_patterns(vec!["**/subdir/*.pyc".to_string()])
+        .skip_confirmation(true)
+        .build();
+    let mut job = CleaningJob::new(config);
     job.run().unwrap();
 
     // .pyc files in root should be deleted
@@ -294,19 +240,17 @@ fn test_stats_mode() {
     let temp_dir = create_test_structure();
     let base_path = temp_dir.path().to_str().unwrap().to_string();
 
-    let mut job = CleaningJob::new(
-        base_path,
-        vec!["**/*.pyc".to_string(), "**/__pycache__".to_string()],
-        vec![],  // exclude_patterns
-        true,  // dry_run
-        true,  // skip_confirmation
-        false, // include_symlinks
-        false, // remove_broken_symlinks
-        true,  // stats_mode
-        None,  // older_than_secs
-        false, // show_progress
-    );
-
+    let config = CleanConfig::builder()
+        .path(base_path)
+        .patterns(vec![
+            "**/*.pyc".to_string(),
+            "**/__pycache__".to_string(),
+        ])
+        .dry_run(true)
+        .skip_confirmation(true)
+        .stats_mode(true)
+        .build();
+    let mut job = CleaningJob::new(config);
     job.run().unwrap();
 
     // Statistics should be populated
@@ -316,6 +260,63 @@ fn test_stats_mode() {
     assert!(job.stats.contains_key("**/*.pyc") || job.stats.contains_key("**/__pycache__"));
 
     // Total count should match
-    let total_count: i32 = job.stats.values().map(|(count, _)| count).sum();
+    let total_count: usize = job.stats.values().map(|(count, _)| count).sum();
     assert_eq!(total_count, job.counter);
+}
+
+#[test]
+fn test_older_than_skips_recent_files() {
+    let temp_dir = TempDir::new().unwrap();
+    let base = temp_dir.path();
+
+    // Create a file (will have current timestamp)
+    fs::write(base.join("recent.pyc"), "recent content").unwrap();
+
+    let base_path = base.to_str().unwrap().to_string();
+
+    let config = CleanConfig::builder()
+        .path(base_path)
+        .patterns(vec!["**/*.pyc".to_string()])
+        .dry_run(true)
+        .skip_confirmation(true)
+        .older_than_secs(Some(3600))
+        .build();
+    let mut job = CleaningJob::new(config);
+    job.run().unwrap();
+
+    // File was just created, so it should be skipped (too recent)
+    assert_eq!(job.counter, 0);
+}
+
+#[test]
+fn test_older_than_matches_old_files() {
+    let temp_dir = TempDir::new().unwrap();
+    let base = temp_dir.path();
+
+    // Create a file and backdate its modification time
+    let old_file = base.join("old.pyc");
+    fs::write(&old_file, "old content").unwrap();
+
+    // Set modification time to 2 hours ago
+    let two_hours_ago = SystemTime::now() - Duration::from_secs(7200);
+    filetime::set_file_mtime(
+        &old_file,
+        filetime::FileTime::from_system_time(two_hours_ago),
+    )
+    .unwrap();
+
+    let base_path = base.to_str().unwrap().to_string();
+
+    let config = CleanConfig::builder()
+        .path(base_path)
+        .patterns(vec!["**/*.pyc".to_string()])
+        .dry_run(true)
+        .skip_confirmation(true)
+        .older_than_secs(Some(3600))
+        .build();
+    let mut job = CleaningJob::new(config);
+    job.run().unwrap();
+
+    // File is 2 hours old, threshold is 1 hour, so it should be matched
+    assert_eq!(job.counter, 1);
 }

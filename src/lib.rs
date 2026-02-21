@@ -2,7 +2,7 @@ pub mod constants;
 
 use dialoguer::Confirm;
 use fs_extra::dir::get_size;
-use globset::{Glob, GlobSet, GlobSetBuilder};
+use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::{error, info, warn};
 use logging_timer::time;
@@ -55,12 +55,104 @@ impl From<globset::Error> for CleanError {
 pub type Result<T> = std::result::Result<T, CleanError>;
 
 // --------------------------------------------------------------------
-// core
+// utilities
 
-/// Main configuration object for cleaning jobs with partial
-/// with selective (de)serialization
-#[derive(Serialize, Deserialize)]
-pub struct CleaningJob {
+/// Parse duration string like "30d", "7d", "24h", "3600s" into seconds.
+///
+/// Supported units: s (seconds), m (minutes), h (hours), d (days), w (weeks).
+pub fn parse_duration(duration: &str) -> Result<u64> {
+    let duration = duration.trim();
+    if duration.is_empty() {
+        return Err(CleanError::ConfigError(
+            "Duration cannot be empty".to_string(),
+        ));
+    }
+
+    if duration.len() < 2 {
+        return Err(CleanError::ConfigError(format!(
+            "Invalid duration '{}': must be a number followed by a unit (s, m, h, d, w)",
+            duration
+        )));
+    }
+
+    let (num_part, unit_part) = duration.split_at(duration.len() - 1);
+    let number: u64 = num_part.parse().map_err(|_| {
+        CleanError::ConfigError(format!("Invalid number in duration: {}", num_part))
+    })?;
+
+    let multiplier = match unit_part {
+        "s" => 1,      // seconds
+        "m" => 60,     // minutes
+        "h" => 3600,   // hours
+        "d" => 86400,  // days
+        "w" => 604800, // weeks
+        _ => {
+            return Err(CleanError::ConfigError(format!(
+                "Invalid duration unit '{}'. Use 's', 'm', 'h', 'd', or 'w'",
+                unit_part
+            )))
+        }
+    };
+
+    Ok(number * multiplier)
+}
+
+/// Format a byte count as a human-readable string using binary units.
+///
+/// Uses IEC binary prefixes: B, KiB, MiB, GiB, TiB.
+pub fn format_size(bytes: u64) -> String {
+    const KIB: f64 = 1024.0;
+    const MIB: f64 = KIB * 1024.0;
+    const GIB: f64 = MIB * 1024.0;
+    const TIB: f64 = GIB * 1024.0;
+
+    let size = bytes as f64;
+    if size >= TIB {
+        format!("{:.2} TiB", size / TIB)
+    } else if size >= GIB {
+        format!("{:.2} GiB", size / GIB)
+    } else if size >= MIB {
+        format!("{:.2} MiB", size / MIB)
+    } else if size >= KIB {
+        format!("{:.2} KiB", size / KIB)
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+/// Search upward from `start_dir` for a file named `filename`.
+/// Returns the path to the first match, or None.
+pub fn find_config_upward(start_dir: &Path, filename: &str) -> Option<PathBuf> {
+    let mut dir = start_dir.to_path_buf();
+    loop {
+        let candidate = dir.join(filename);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+        if !dir.pop() {
+            return None;
+        }
+    }
+}
+
+/// Return the path to the global config file, if it exists.
+/// Checks `~/.config/rclean/config.toml`.
+pub fn global_config_path() -> Option<PathBuf> {
+    dirs::config_dir().map(|d| d.join("rclean").join("config.toml")).filter(|p| p.is_file())
+}
+
+/// Discover a config file: first search upward for `.rclean.toml`, then fall back to global.
+pub fn discover_config(start_dir: &Path) -> Option<PathBuf> {
+    find_config_upward(start_dir, constants::SETTINGS_FILENAME)
+        .or_else(global_config_path)
+}
+
+// --------------------------------------------------------------------
+// configuration
+
+/// Serializable configuration for a cleaning job
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CleanConfig {
     pub path: String,
     pub patterns: Vec<String>,
     #[serde(default)]
@@ -75,81 +167,191 @@ pub struct CleaningJob {
     pub older_than_secs: Option<u64>,
     #[serde(default)]
     pub show_progress: bool,
-    #[serde(skip_serializing, skip_deserializing)]
-    targets: Vec<(PathBuf, Metadata)>,
-    #[serde(skip_serializing, skip_deserializing)]
-    pub size: u64,
-    #[serde(skip_serializing, skip_deserializing)]
-    pub counter: i32,
-    #[serde(skip_serializing, skip_deserializing)]
-    pub stats: HashMap<String, (i32, u64)>,
-    #[serde(skip_serializing, skip_deserializing)]
-    pub failed_deletions: Vec<(PathBuf, String)>,
+    #[serde(skip)]
+    pub json_mode: bool,
 }
 
-/// Default values for a cleaningjob instance
-impl Default for CleaningJob {
-    /// default values for a cleaningjob instance
+impl Default for CleanConfig {
     fn default() -> Self {
         Self {
             path: ".".to_string(),
             patterns: vec![],
             exclude_patterns: vec![],
-            dry_run: true,
+            dry_run: false,
             skip_confirmation: false,
             include_symlinks: false,
             remove_broken_symlinks: false,
             stats_mode: false,
             older_than_secs: None,
             show_progress: false,
-            targets: Vec::new(),
-            size: 0,
-            counter: 0,
-            stats: HashMap::new(),
-            failed_deletions: Vec::new(),
+            json_mode: false,
         }
     }
 }
 
-/// CleaningJob methods
+impl CleanConfig {
+    /// Start building a new configuration
+    pub fn builder() -> CleanConfigBuilder {
+        CleanConfigBuilder::default()
+    }
+}
+
+/// Builder for constructing CleanConfig with a fluent API
+#[derive(Default)]
+pub struct CleanConfigBuilder {
+    config: CleanConfig,
+}
+
+impl CleanConfigBuilder {
+    pub fn path(mut self, path: impl Into<String>) -> Self {
+        self.config.path = path.into();
+        self
+    }
+
+    pub fn patterns(mut self, patterns: Vec<String>) -> Self {
+        self.config.patterns = patterns;
+        self
+    }
+
+    pub fn exclude_patterns(mut self, patterns: Vec<String>) -> Self {
+        self.config.exclude_patterns = patterns;
+        self
+    }
+
+    pub fn dry_run(mut self, dry_run: bool) -> Self {
+        self.config.dry_run = dry_run;
+        self
+    }
+
+    pub fn skip_confirmation(mut self, skip: bool) -> Self {
+        self.config.skip_confirmation = skip;
+        self
+    }
+
+    pub fn include_symlinks(mut self, include: bool) -> Self {
+        self.config.include_symlinks = include;
+        self
+    }
+
+    pub fn remove_broken_symlinks(mut self, remove: bool) -> Self {
+        self.config.remove_broken_symlinks = remove;
+        self
+    }
+
+    pub fn stats_mode(mut self, stats: bool) -> Self {
+        self.config.stats_mode = stats;
+        self
+    }
+
+    pub fn older_than_secs(mut self, secs: Option<u64>) -> Self {
+        self.config.older_than_secs = secs;
+        self
+    }
+
+    pub fn show_progress(mut self, progress: bool) -> Self {
+        self.config.show_progress = progress;
+        self
+    }
+
+    pub fn json_mode(mut self, json: bool) -> Self {
+        self.config.json_mode = json;
+        self
+    }
+
+    pub fn build(self) -> CleanConfig {
+        self.config
+    }
+}
+
+// --------------------------------------------------------------------
+// core
+
+/// Pre-compiled pattern matchers for statistics attribution
+type PatternMatchers = Vec<(String, GlobMatcher)>;
+
+/// A matched item for structured output
+#[derive(Serialize, Debug)]
+pub struct MatchedItem {
+    pub path: String,
+    pub size: u64,
+    pub pattern: String,
+}
+
+/// Runtime executor for cleaning jobs
+pub struct CleaningJob {
+    pub config: CleanConfig,
+    targets: Vec<(PathBuf, Metadata)>,
+    pub size: u64,
+    pub counter: usize,
+    pub stats: HashMap<String, (usize, u64)>,
+    pub failed_deletions: Vec<(PathBuf, String)>,
+    pub matched_items: Vec<MatchedItem>,
+}
+
 impl CleaningJob {
-    /// constructor
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        path: String,
-        patterns: Vec<String>,
-        exclude_patterns: Vec<String>,
-        dry_run: bool,
-        skip_confirmation: bool,
-        include_symlinks: bool,
-        remove_broken_symlinks: bool,
-        stats_mode: bool,
-        older_than_secs: Option<u64>,
-        show_progress: bool,
-    ) -> Self {
+    /// Create a new cleaning job from a configuration
+    pub fn new(config: CleanConfig) -> Self {
         Self {
-            path,
-            patterns,
-            exclude_patterns,
-            dry_run,
-            skip_confirmation,
-            include_symlinks,
-            remove_broken_symlinks,
-            stats_mode,
-            older_than_secs,
-            show_progress,
+            config,
             targets: Vec::new(),
             size: 0,
             counter: 0,
             stats: HashMap::new(),
             failed_deletions: Vec::new(),
+            matched_items: Vec::new(),
         }
     }
 
-    /// run the cleaning job
+    /// Return whether any deletions failed
+    pub fn has_failures(&self) -> bool {
+        !self.failed_deletions.is_empty()
+    }
+
+    /// Produce JSON output summarizing the run
+    pub fn to_json(&self) -> std::result::Result<String, serde_json::Error> {
+        let stats: Vec<_> = self
+            .stats
+            .iter()
+            .map(|(pattern, (count, size))| {
+                serde_json::json!({
+                    "pattern": pattern,
+                    "count": count,
+                    "size": size,
+                    "size_human": format_size(*size),
+                })
+            })
+            .collect();
+
+        let failures: Vec<_> = self
+            .failed_deletions
+            .iter()
+            .map(|(path, err)| {
+                serde_json::json!({
+                    "path": path.display().to_string(),
+                    "error": err,
+                })
+            })
+            .collect();
+
+        let output = serde_json::json!({
+            "matches": self.matched_items,
+            "summary": {
+                "total_count": self.counter,
+                "total_size": self.size,
+                "total_size_human": format_size(self.size),
+                "dry_run": self.config.dry_run,
+            },
+            "stats": stats,
+            "failures": failures,
+        });
+
+        serde_json::to_string_pretty(&output)
+    }
+
+    /// Run the cleaning job
     #[time("info")]
     pub fn run(&mut self) -> Result<()> {
-        let path_str = self.path.clone();
+        let path_str = self.config.path.clone();
         let path = Path::new(&path_str);
 
         // Canonicalize base path for security checks
@@ -158,18 +360,18 @@ impl CleaningJob {
         })?;
 
         // Build globsets
-        let (include_set, exclude_set) = self.build_globsets()?;
+        let (include_set, exclude_set, matchers) = self.build_globsets()?;
 
         // Collect targets
-        self.collect_targets(path, &base_path, &include_set, &exclude_set)?;
+        self.collect_targets(path, &base_path, &include_set, &exclude_set, &matchers)?;
 
-        // Display statistics if enabled
-        if self.stats_mode {
+        // Display statistics if enabled (suppressed in JSON mode)
+        if self.config.stats_mode && !self.config.json_mode {
             self.display_stats();
         }
 
         // Confirm deletion if needed
-        if !self.targets.is_empty() && !self.skip_confirmation {
+        if !self.targets.is_empty() && !self.config.skip_confirmation {
             let confirmation = Confirm::new()
                 .with_prompt("Do you want to delete the above?")
                 .interact()
@@ -183,29 +385,33 @@ impl CleaningJob {
             }
         }
 
-        // Display summary
-        if !self.dry_run && self.counter > 0 {
+        // Display summary (suppressed in JSON mode)
+        if !self.config.dry_run && self.counter > 0 && !self.config.json_mode {
             info!(
-                "Deleted {} item(s) totalling {:.2} MB",
+                "Deleted {} item(s) totalling {}",
                 self.counter,
-                (self.size as f64) / 1000000.
+                format_size(self.size)
             );
         }
 
         Ok(())
     }
 
-    /// Build globsets for include and exclude patterns
-    fn build_globsets(&self) -> Result<(GlobSet, Option<GlobSet>)> {
+    /// Build globsets for include and exclude patterns, plus individual matchers for stats
+    fn build_globsets(&self) -> Result<(GlobSet, Option<GlobSet>, PatternMatchers)> {
         let mut builder = GlobSetBuilder::new();
-        for pattern in self.patterns.iter() {
-            builder.add(Glob::new(pattern)?);
+        let mut matchers = Vec::new();
+
+        for pattern in self.config.patterns.iter() {
+            let glob = Glob::new(pattern)?;
+            builder.add(glob.clone());
+            matchers.push((pattern.clone(), glob.compile_matcher()));
         }
         let include_set = builder.build()?;
 
-        let exclude_set = if !self.exclude_patterns.is_empty() {
+        let exclude_set = if !self.config.exclude_patterns.is_empty() {
             let mut builder = GlobSetBuilder::new();
-            for pattern in self.exclude_patterns.iter() {
+            for pattern in self.config.exclude_patterns.iter() {
                 builder.add(Glob::new(pattern)?);
             }
             Some(builder.build()?)
@@ -213,7 +419,7 @@ impl CleaningJob {
             None
         };
 
-        Ok((include_set, exclude_set))
+        Ok((include_set, exclude_set, matchers))
     }
 
     /// Check if path should be processed (basic filtering only)
@@ -260,13 +466,14 @@ impl CleaningJob {
         true
     }
 
-    /// Find which pattern matched the entry (for statistics)
-    fn find_matching_pattern(&self, entry_path: &Path) -> Option<String> {
-        for pattern in self.patterns.iter() {
-            if let Ok(glob) = Glob::new(pattern) {
-                if glob.compile_matcher().is_match(entry_path) {
-                    return Some(pattern.clone());
-                }
+    /// Find which pattern matched the entry using pre-compiled matchers
+    fn find_matching_pattern(
+        matchers: &[(String, GlobMatcher)],
+        entry_path: &Path,
+    ) -> Option<String> {
+        for (pattern, matcher) in matchers {
+            if matcher.is_match(entry_path) {
+                return Some(pattern.clone());
             }
         }
         None
@@ -279,14 +486,15 @@ impl CleaningJob {
         base_path: &Path,
         include_set: &GlobSet,
         exclude_set: &Option<GlobSet>,
+        matchers: &[(String, GlobMatcher)],
     ) -> Result<()> {
         // Create progress bar if requested
-        let progress = if self.show_progress {
+        let progress = if self.config.show_progress {
             let pb = ProgressBar::new_spinner();
             pb.set_style(
                 ProgressStyle::default_spinner()
                     .template("{spinner:.green} [{elapsed_precise}] {msg}")
-                    .unwrap()
+                    .unwrap(),
             );
             pb.set_message("Scanning files...");
             pb.enable_steady_tick(Duration::from_millis(100));
@@ -317,9 +525,13 @@ impl CleaningJob {
             }
 
             // Handle broken symlinks
-            if self.remove_broken_symlinks && entry_path.is_symlink() {
+            if self.config.remove_broken_symlinks && entry_path.is_symlink() {
                 if let Err(_e) = fs::metadata(entry_path) {
-                    self.handle_matched_entry(&entry, "broken-symlink".to_string())?;
+                    self.handle_matched_entry(
+                        &entry,
+                        "broken-symlink".to_string(),
+                        &progress,
+                    )?;
                     continue;
                 }
             }
@@ -332,8 +544,11 @@ impl CleaningJob {
             // Check if path matches exclude patterns
             if let Some(ref exclude) = exclude_set {
                 if exclude.is_match(entry_path) {
-                    if !self.show_progress {
-                        info!("Excluded: {:?}", entry_path.display());
+                    let msg = format!("Excluded: {:?}", entry_path.display());
+                    if let Some(ref pb) = progress {
+                        pb.println(&msg);
+                    } else {
+                        info!("{}", msg);
                     }
                     continue;
                 }
@@ -343,47 +558,57 @@ impl CleaningJob {
             let is_symlink = entry.path_is_symlink();
 
             // Skip symlinks unless explicitly included
-            if is_symlink && !self.include_symlinks {
+            if is_symlink && !self.config.include_symlinks {
                 continue;
             }
 
             // Security check: verify path is within base directory
-            // Only warn for paths that match patterns (to avoid noisy output)
             if !self.is_path_safe(entry_path, base_path, is_symlink) {
                 continue;
             }
 
             // Find matching pattern for statistics
-            let pattern = self
-                .find_matching_pattern(entry_path)
+            let pattern = Self::find_matching_pattern(matchers, entry_path)
                 .unwrap_or_else(|| "unknown".to_string());
 
-            self.handle_matched_entry(&entry, pattern)?;
+            self.handle_matched_entry(&entry, pattern, &progress)?;
         }
 
         // Finish progress bar
         if let Some(pb) = progress {
-            pb.finish_with_message(format!("Scan complete: {} items scanned, {} matches found", processed, self.counter));
+            pb.finish_with_message(format!(
+                "Scan complete: {} items scanned, {} matches found",
+                processed, self.counter
+            ));
         }
 
         Ok(())
     }
 
     /// Handle a matched entry (add to targets, update stats, or delete immediately)
-    fn handle_matched_entry(&mut self, entry: &walkdir::DirEntry, pattern: String) -> Result<()> {
+    fn handle_matched_entry(
+        &mut self,
+        entry: &walkdir::DirEntry,
+        pattern: String,
+        progress: &Option<ProgressBar>,
+    ) -> Result<()> {
         let entry_path = entry.path();
 
         // Get and cache metadata
         let metadata = match entry.metadata() {
             Ok(m) => m,
             Err(e) => {
-                error!("Failed to get metadata for {:?}: {}", entry_path.display(), e);
+                error!(
+                    "Failed to get metadata for {:?}: {}",
+                    entry_path.display(),
+                    e
+                );
                 return Ok(());
             }
         };
 
         // Check age-based filtering
-        if let Some(older_than_secs) = self.older_than_secs {
+        if let Some(older_than_secs) = self.config.older_than_secs {
             if let Ok(modified) = metadata.modified() {
                 if let Ok(elapsed) = SystemTime::now().duration_since(modified) {
                     if elapsed.as_secs() < older_than_secs {
@@ -407,22 +632,41 @@ impl CleaningJob {
         self.counter += 1;
 
         // Update statistics
-        if self.stats_mode {
+        if self.config.stats_mode {
             let stat = self.stats.entry(pattern.clone()).or_insert((0, 0));
             stat.0 += 1;
             stat.1 += item_size;
         }
 
+        // Collect for JSON output
+        if self.config.json_mode {
+            self.matched_items.push(MatchedItem {
+                path: entry_path.display().to_string(),
+                size: item_size,
+                pattern: pattern.clone(),
+            });
+        }
+
         // Either delete immediately or add to targets
-        if self.skip_confirmation && !self.dry_run {
+        if self.config.skip_confirmation && !self.config.dry_run {
             self.remove_entry(entry);
-            if !self.show_progress {
-                info!("Deleted: {:?}", entry_path.display());
+            if !self.config.json_mode {
+                let msg = format!("Deleted: {:?}", entry_path.display());
+                if let Some(ref pb) = progress {
+                    pb.println(&msg);
+                } else {
+                    info!("{}", msg);
+                }
             }
         } else {
             self.targets.push((entry_path.to_path_buf(), metadata));
-            if !self.show_progress {
-                info!("Matched: {:?}", entry_path.display());
+            if !self.config.json_mode {
+                let msg = format!("Matched: {:?}", entry_path.display());
+                if let Some(ref pb) = progress {
+                    pb.println(&msg);
+                } else {
+                    info!("{}", msg);
+                }
             }
         }
 
@@ -431,11 +675,10 @@ impl CleaningJob {
 
     /// Execute deletion of collected targets
     fn execute_deletion(&mut self) {
-        // Clone targets to avoid borrow checker issues
-        let targets_to_delete: Vec<_> = self.targets.clone();
+        let targets_to_delete = std::mem::take(&mut self.targets);
 
         for (path, metadata) in targets_to_delete.iter() {
-            if !self.dry_run {
+            if !self.config.dry_run {
                 self.remove_path(path, metadata);
             }
         }
@@ -452,33 +695,26 @@ impl CleaningJob {
 
     /// Display statistics about matches
     fn display_stats(&self) {
-        if !self.stats_mode {
+        if !self.config.stats_mode {
             return;
         }
 
-        if !self.show_progress {
-            info!("\n=== Statistics ===");
-            let mut patterns: Vec<_> = self.stats.iter().collect();
-            patterns.sort_by(|a, b| b.1.0.cmp(&a.1.0)); // Sort by count descending
+        info!("\n=== Statistics ===");
+        let mut patterns: Vec<_> = self.stats.iter().collect();
+        patterns.sort_by(|a, b| b.1 .0.cmp(&a.1 .0)); // Sort by count descending
 
-            for (pattern, (count, size)) in patterns {
-                info!(
-                    "  {}: {} item(s), {:.2} MB",
-                    pattern,
-                    count,
-                    (*size as f64) / 1000000.
-                );
-            }
-            info!("==================\n");
+        for (pattern, (count, size)) in patterns {
+            info!(
+                "  {}: {} item(s), {}",
+                pattern,
+                count,
+                format_size(*size)
+            );
         }
+        info!("==================\n");
     }
 
-    /// remove collected targets (kept for compatibility)
-    pub fn remove_targets(&mut self) {
-        self.execute_deletion();
-    }
-
-    /// remove file or directory with path and metadata
+    /// Remove file or directory with path and metadata
     fn remove_path(&mut self, path: &Path, metadata: &Metadata) {
         let result = if metadata.is_dir() {
             fs::remove_dir_all(path)
@@ -496,8 +732,8 @@ impl CleaningJob {
         }
     }
 
-    /// remove file or directory with some safety measures (kept for compatibility)
-    pub fn remove_entry(&mut self, entry: &walkdir::DirEntry) {
+    /// Remove file or directory from a walkdir entry
+    fn remove_entry(&mut self, entry: &walkdir::DirEntry) {
         let p = entry.path();
 
         let target = match entry.metadata() {

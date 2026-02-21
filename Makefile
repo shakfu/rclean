@@ -1,10 +1,13 @@
 
-.PHONY: all build install clean
+.PHONY: all build test install clean
 
 all: build
 
 build:
 	@cargo build --release
+
+test:
+	@cargo test
 
 clean:
 	@rm -rf target
