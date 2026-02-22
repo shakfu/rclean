@@ -320,3 +320,42 @@ fn test_older_than_matches_old_files() {
     // File is 2 hours old, threshold is 1 hour, so it should be matched
     assert_eq!(job.counter, 1);
 }
+
+#[test]
+fn test_no_failures_when_dir_and_children_both_match() {
+    let temp_dir = TempDir::new().unwrap();
+    let base = temp_dir.path();
+
+    // Create nested __pycache__ dirs with .pyc files
+    let cache1 = base.join("__pycache__");
+    fs::create_dir(&cache1).unwrap();
+    fs::write(cache1.join("a.cpython-311.pyc"), "cached").unwrap();
+    fs::write(cache1.join("b.cpython-311.pyc"), "cached").unwrap();
+
+    let sub = base.join("pkg");
+    fs::create_dir(&sub).unwrap();
+    let cache2 = sub.join("__pycache__");
+    fs::create_dir(&cache2).unwrap();
+    fs::write(cache2.join("c.cpython-311.pyc"), "cached").unwrap();
+
+    let base_path = base.to_str().unwrap().to_string();
+
+    // Patterns that match both the directories AND the files inside them
+    let config = CleanConfig::builder()
+        .path(base_path)
+        .patterns(vec![
+            "**/__pycache__".to_string(),
+            "**/*.pyc".to_string(),
+        ])
+        .skip_confirmation(true)
+        .build();
+    let mut job = CleaningJob::new(config);
+    job.run().unwrap();
+
+    // Everything should be gone
+    assert!(!cache1.exists());
+    assert!(!cache2.exists());
+
+    // No failures -- child files should be skipped, not produce ENOENT errors
+    assert!(!job.has_failures());
+}

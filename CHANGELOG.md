@@ -15,6 +15,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ---
 
+## [0.2.2]
+
+### Fixed
+
+- **Critical: Spurious ENOENT failures when directory and child patterns overlap**: When glob patterns matched both a directory (e.g., `**/__pycache__`) and files inside it (e.g., `**/*.pyc`), `remove_dir_all` on the directory would recursively delete all children. Subsequent attempts to delete those same children individually produced hundreds of "No such file or directory" errors. `execute_deletion()` now tracks which directories have been recursively removed and skips any targets that are descendants of an already-deleted directory.
+
+### Added
+
+- **Regression test**: `test_no_failures_when_dir_and_children_both_match` covering the overlapping directory/child pattern scenario (55 tests total)
+
+---
+
 ## [0.2.1]
 
 ### Added

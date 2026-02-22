@@ -676,10 +676,19 @@ impl CleaningJob {
     /// Execute deletion of collected targets
     fn execute_deletion(&mut self) {
         let targets_to_delete = std::mem::take(&mut self.targets);
+        let mut deleted_dirs: Vec<PathBuf> = Vec::new();
 
         for (path, metadata) in targets_to_delete.iter() {
             if !self.config.dry_run {
+                // Skip paths whose parent directory was already recursively deleted
+                let dominated = deleted_dirs.iter().any(|dir| path.starts_with(dir));
+                if dominated {
+                    continue;
+                }
                 self.remove_path(path, metadata);
+                if metadata.is_dir() {
+                    deleted_dirs.push(path.clone());
+                }
             }
         }
 
