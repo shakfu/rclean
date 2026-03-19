@@ -9,7 +9,9 @@ use std::io;
 use std::path::Path;
 use std::process;
 
-use drclean::constants::{get_default_patterns, get_preset_patterns, PRESET_NAMES, SETTINGS_FILENAME};
+use drclean::constants::{
+    get_default_patterns, get_preset_patterns, PRESET_NAMES, SETTINGS_FILENAME,
+};
 use drclean::{discover_config, parse_duration, CleanConfig, CleaningJob, Result};
 
 // --------------------------------------------------------------------

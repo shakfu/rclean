@@ -166,13 +166,14 @@ pub fn find_config_upward(start_dir: &Path, filename: &str) -> Option<PathBuf> {
 /// Return the path to the global config file, if it exists.
 /// Checks `~/.config/drclean/config.toml`.
 pub fn global_config_path() -> Option<PathBuf> {
-    dirs::config_dir().map(|d| d.join("drclean").join("config.toml")).filter(|p| p.is_file())
+    dirs::config_dir()
+        .map(|d| d.join("drclean").join("config.toml"))
+        .filter(|p| p.is_file())
 }
 
 /// Discover a config file: first search upward for `.drclean.toml`, then fall back to global.
 pub fn discover_config(start_dir: &Path) -> Option<PathBuf> {
-    find_config_upward(start_dir, constants::SETTINGS_FILENAME)
-        .or_else(global_config_path)
+    find_config_upward(start_dir, constants::SETTINGS_FILENAME).or_else(global_config_path)
 }
 
 // --------------------------------------------------------------------
@@ -422,9 +423,9 @@ impl CleaningJob {
         let path = Path::new(&path_str);
 
         // Canonicalize base path for security checks
-        let base_path = path.canonicalize().map_err(|e| {
-            CleanError::ConfigError(format!("Invalid path '{}': {}", path_str, e))
-        })?;
+        let base_path = path
+            .canonicalize()
+            .map_err(|e| CleanError::ConfigError(format!("Invalid path '{}': {}", path_str, e)))?;
 
         // Build globsets
         let (include_set, exclude_set, matchers) = self.build_globsets()?;
@@ -594,11 +595,7 @@ impl CleaningJob {
             // Handle broken symlinks
             if self.config.remove_broken_symlinks && entry_path.is_symlink() {
                 if let Err(_e) = fs::metadata(entry_path) {
-                    self.handle_matched_entry(
-                        &entry,
-                        "broken-symlink".to_string(),
-                        &progress,
-                    )?;
+                    self.handle_matched_entry(&entry, "broken-symlink".to_string(), &progress)?;
                     continue;
                 }
             }
@@ -780,12 +777,7 @@ impl CleaningJob {
         patterns.sort_by(|a, b| b.1 .0.cmp(&a.1 .0)); // Sort by count descending
 
         for (pattern, (count, size)) in patterns {
-            info!(
-                "  {}: {} item(s), {}",
-                pattern,
-                count,
-                format_size(*size)
-            );
+            info!("  {}: {} item(s), {}", pattern, count, format_size(*size));
         }
         info!("==================\n");
     }

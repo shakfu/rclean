@@ -4,9 +4,7 @@
 pub const SETTINGS_FILENAME: &str = ".drclean.toml";
 
 /// Available preset names
-pub const PRESET_NAMES: &[&str] = &[
-    "common", "python", "node", "rust", "java", "c", "go", "all",
-];
+pub const PRESET_NAMES: &[&str] = &["common", "python", "node", "rust", "java", "c", "go", "all"];
 
 /// Get patterns for a named preset
 pub fn get_preset_patterns(name: &str) -> Option<Vec<String>> {
@@ -49,9 +47,7 @@ pub fn get_preset_patterns(name: &str) -> Option<Vec<String>> {
             "**/coverage",
             "**/.nyc_output",
         ],
-        "rust" => vec![
-            "**/target",
-        ],
+        "rust" => vec!["**/target"],
         "java" => vec![
             "**/*.class",
             "**/target",
@@ -70,9 +66,7 @@ pub fn get_preset_patterns(name: &str) -> Option<Vec<String>> {
             "**/*.dylib",
             "**/*.dll",
         ],
-        "go" => vec![
-            "**/vendor",
-        ],
+        "go" => vec!["**/vendor"],
         "all" => {
             let mut all = Vec::new();
             for preset in &["common", "python", "node", "rust", "java", "c", "go"] {

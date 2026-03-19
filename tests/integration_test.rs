@@ -96,10 +96,7 @@ fn test_multiple_patterns() {
 
     let config = CleanConfig::builder()
         .path(base_path)
-        .patterns(vec![
-            "**/*.pyc".to_string(),
-            "**/__pycache__".to_string(),
-        ])
+        .patterns(vec!["**/*.pyc".to_string(), "**/__pycache__".to_string()])
         .skip_confirmation(true)
         .build();
     let mut job = CleaningJob::new(config);
@@ -242,10 +239,7 @@ fn test_stats_mode() {
 
     let config = CleanConfig::builder()
         .path(base_path)
-        .patterns(vec![
-            "**/*.pyc".to_string(),
-            "**/__pycache__".to_string(),
-        ])
+        .patterns(vec!["**/*.pyc".to_string(), "**/__pycache__".to_string()])
         .dry_run(true)
         .skip_confirmation(true)
         .stats_mode(true)
@@ -343,10 +337,7 @@ fn test_no_failures_when_dir_and_children_both_match() {
     // Patterns that match both the directories AND the files inside them
     let config = CleanConfig::builder()
         .path(base_path)
-        .patterns(vec![
-            "**/__pycache__".to_string(),
-            "**/*.pyc".to_string(),
-        ])
+        .patterns(vec!["**/__pycache__".to_string(), "**/*.pyc".to_string()])
         .skip_confirmation(true)
         .build();
     let mut job = CleaningJob::new(config);
