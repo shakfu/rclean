@@ -1,4 +1,4 @@
-use rclean::format_size;
+use drclean::format_size;
 
 #[test]
 fn test_format_size_bytes() {

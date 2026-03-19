@@ -136,12 +136,12 @@ pub fn find_config_upward(start_dir: &Path, filename: &str) -> Option<PathBuf> {
 }
 
 /// Return the path to the global config file, if it exists.
-/// Checks `~/.config/rclean/config.toml`.
+/// Checks `~/.config/drclean/config.toml`.
 pub fn global_config_path() -> Option<PathBuf> {
-    dirs::config_dir().map(|d| d.join("rclean").join("config.toml")).filter(|p| p.is_file())
+    dirs::config_dir().map(|d| d.join("drclean").join("config.toml")).filter(|p| p.is_file())
 }
 
-/// Discover a config file: first search upward for `.rclean.toml`, then fall back to global.
+/// Discover a config file: first search upward for `.drclean.toml`, then fall back to global.
 pub fn discover_config(start_dir: &Path) -> Option<PathBuf> {
     find_config_upward(start_dir, constants::SETTINGS_FILENAME)
         .or_else(global_config_path)

@@ -1,4 +1,4 @@
-# rclean
+# drclean
 
 A fast, safe Rust command-line utility for recursively removing files and directories matching glob patterns. Designed for cleaning development artifacts with multiple safety measures and performance optimizations.
 
@@ -9,7 +9,7 @@ A fast, safe Rust command-line utility for recursively removing files and direct
 - **Safety First**: Path traversal protection, symlink guards, confirmation prompts, and dry-run mode
 - **Performance**: Metadata caching, pre-compiled glob matchers, and optimized traversal
 - **Statistics**: Optional breakdown of deletions by pattern with size reporting
-- **Configuration**: `.rclean.toml` with automatic discovery (upward search + global fallback)
+- **Configuration**: `.drclean.toml` with automatic discovery (upward search + global fallback)
 - **JSON Output**: Machine-readable output for scripting and automation
 - **Shell Completions**: Generated completions for bash, zsh, fish, elvish, powershell
 - **Error Handling**: Graceful error recovery with clear diagnostics; non-zero exit on failures
@@ -27,18 +27,18 @@ cargo build --release
 ## Usage
 
 ```sh
-% rclean --help
+% drclean --help
 Safely remove files and directories matching a set of glob patterns.
 
-Usage: rclean [OPTIONS]
+Usage: drclean [OPTIONS]
 
 Options:
   -p, --path <PATH>               Working directory [default: .]
   -g, --glob <GLOB>               Include glob pattern(s) (can specify multiple)
   -e, --exclude <EXCLUDE>         Exclude glob pattern(s) (can specify multiple)
       --preset <PRESET>           Use a named preset (common, python, node, rust, java, c, go, all)
-  -c, --configfile [PATH]         Load config (searches upward, then ~/.config/rclean/)
-  -w, --write-configfile          Write default '.rclean.toml' file
+  -c, --configfile [PATH]         Load config (searches upward, then ~/.config/drclean/)
+  -w, --write-configfile          Write default '.drclean.toml' file
   -d, --dry-run                   Preview deletions without removing
   -y, --skip-confirmation         Skip confirmation prompt
   -s, --stats                     Display statistics by pattern
@@ -59,54 +59,54 @@ Options:
 
 ```bash
 # Preview what would be deleted (dry-run)
-rclean -d
+drclean -d
 
 # Remove with default patterns (requires confirmation)
-rclean
+drclean
 
 # Custom patterns with multiple includes
-rclean -g "*.log" -g "**/*.tmp"
+drclean -g "*.log" -g "**/*.tmp"
 
 # Exclude specific patterns
-rclean -g "*.cache" -e "**/important.cache"
+drclean -g "*.cache" -e "**/important.cache"
 
 # Use presets for specific ecosystems
-rclean --preset node
-rclean --preset rust
-rclean --preset python --preset common
+drclean --preset node
+drclean --preset rust
+drclean --preset python --preset common
 
 # Combine presets with custom patterns
-rclean --preset python -g "**/*.log"
+drclean --preset python -g "**/*.log"
 
 # List available presets and their patterns
-rclean -l --preset python
+drclean -l --preset python
 
 # Show statistics breakdown
-rclean -s
+drclean -s
 
 # Only remove files older than 30 days
-rclean -o 30d
+drclean -o 30d
 
 # Remove broken symlinks
-rclean -b
+drclean -b
 
 # Skip confirmation (use with caution)
-rclean -y
+drclean -y
 
-# Use config file (auto-discovers .rclean.toml upward or ~/.config/rclean/)
-rclean -c
+# Use config file (auto-discovers .drclean.toml upward or ~/.config/drclean/)
+drclean -c
 
 # Use config file with CLI overrides
-rclean -c --dry-run --stats
+drclean -c --dry-run --stats
 
 # Use explicit config file path
-rclean -c configs/my-cleanup.toml
+drclean -c configs/my-cleanup.toml
 
 # JSON output for scripting
-rclean -d --format json | jq '.summary'
+drclean -d --format json | jq '.summary'
 
 # Quiet mode for scripting
-rclean -y -q
+drclean -y -q
 ```
 
 ## Presets
@@ -126,20 +126,20 @@ Named pattern groups for common ecosystems. Use `--preset` to select one or more
 
 Default patterns (no `--preset` or `--glob`): `common` + `python` combined.
 
-View any preset's patterns with `rclean -l --preset <name>`.
+View any preset's patterns with `drclean -l --preset <name>`.
 
 ## Configuration
 
 ### Config File
 
-Create a `.rclean.toml` file to persist your settings:
+Create a `.drclean.toml` file to persist your settings:
 
 ```bash
 # Generate default config
-rclean -w
+drclean -w
 ```
 
-Example `.rclean.toml`:
+Example `.drclean.toml`:
 
 ```toml
 path = "."
@@ -161,14 +161,14 @@ stats_mode = true
 
 ### Config Discovery
 
-When you run `rclean -c` (without a path), the tool searches for configuration in this order:
+When you run `drclean -c` (without a path), the tool searches for configuration in this order:
 
-1. `.rclean.toml` in the current directory, then each parent directory upward
-2. `~/.config/rclean/config.toml` (global config)
+1. `.drclean.toml` in the current directory, then each parent directory upward
+2. `~/.config/drclean/config.toml` (global config)
 
-You can also specify an explicit path: `rclean -c path/to/config.toml`.
+You can also specify an explicit path: `drclean -c path/to/config.toml`.
 
-CLI flags always override config file values (e.g., `rclean -c --dry-run` forces dry-run even if the config says `dry_run = false`).
+CLI flags always override config file values (e.g., `drclean -c --dry-run` forces dry-run even if the config says `dry_run = false`).
 
 ### Shell Completions
 
@@ -176,13 +176,13 @@ Generate shell completions for your shell:
 
 ```bash
 # Bash
-rclean --completions bash > ~/.bash_completions/rclean
+drclean --completions bash > ~/.bash_completions/drclean
 
 # Zsh
-rclean --completions zsh > ~/.zfunc/_rclean
+drclean --completions zsh > ~/.zfunc/_drclean
 
 # Fish
-rclean --completions fish > ~/.config/fish/completions/rclean.fish
+drclean --completions fish > ~/.config/fish/completions/drclean.fish
 ```
 
 ### JSON Output
@@ -190,7 +190,7 @@ rclean --completions fish > ~/.config/fish/completions/rclean.fish
 Use `--format json` for machine-readable output:
 
 ```bash
-rclean -d --format json | jq '.summary'
+drclean -d --format json | jq '.summary'
 ```
 
 The JSON output includes four sections:

@@ -1,7 +1,7 @@
 // --------------------------------------------------------------------
 // constants
 
-pub const SETTINGS_FILENAME: &str = ".rclean.toml";
+pub const SETTINGS_FILENAME: &str = ".drclean.toml";
 
 /// Available preset names
 pub const PRESET_NAMES: &[&str] = &[

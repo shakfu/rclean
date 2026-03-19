@@ -1,12 +1,12 @@
 [package]
-name = "rclean"
+name = "drclean"
 version = "0.2.1"
 edition = "2021"
 authors = ["Shakeeb Alireza"]
 description = "Safely remove files and directories matching a set of glob patterns."
 readme = "README.md"
-homepage = "https://github.com/shakfu/rclean"
-repository = "https://github.com/shakfu/rclean"
+homepage = "https://github.com/shakfu/drclean"
+repository = "https://github.com/shakfu/drclean"
 license = "MIT"
 keywords = ["clean", "delete", "cleanup", "filesystem", "glob"]
 categories = ["command-line-utilities"]

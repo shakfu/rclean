@@ -35,21 +35,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - All fields configurable via chained methods (e.g., `.path(".")..dry_run(true).build()`)
   - Eliminates need for `#[allow(clippy::too_many_arguments)]`
 
-- **Config Discovery**: `rclean -c` (without a path) now searches for config automatically
-  - Searches upward from the current directory for `.rclean.toml`
-  - Falls back to global config at `~/.config/rclean/config.toml`
-  - Explicit path still supported: `rclean -c path/to/config.toml`
+- **Config Discovery**: `drclean -c` (without a path) now searches for config automatically
+  - Searches upward from the current directory for `.drclean.toml`
+  - Falls back to global config at `~/.config/drclean/config.toml`
+  - Explicit path still supported: `drclean -c path/to/config.toml`
   - New public functions: `find_config_upward()`, `global_config_path()`, `discover_config()`
 
 - **CLI Flag Overrides**: When using `-c`, CLI flags now override config file values
   - `--dry-run`, `--stats`, `--progress`, `--exclude`, `--older-than`, etc.
-  - Example: `rclean -c --dry-run` forces dry-run even if config says `dry_run = false`
+  - Example: `drclean -c --dry-run` forces dry-run even if config says `dry_run = false`
 
 - **Pattern Presets**: Named pattern groups via `--preset` flag
   - Available presets: `common`, `python`, `node`, `rust`, `java`, `c`, `go`, `all`
   - Combinable: `--preset python --preset node`
   - Combinable with custom patterns: `--preset python -g "**/*.log"`
-  - List preset contents: `rclean -l --preset python`
+  - List preset contents: `drclean -l --preset python`
 
 - **JSON Output**: `--format json` for machine-readable structured output
   - Includes `matches`, `summary`, `stats`, and `failures` sections
@@ -130,7 +130,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Uses `indicatif` crate for smooth spinner animation
 
 - **Age-Based Filtering**: New `--older-than` (`-o`) flag to only remove old files
-  - Example: `rclean -g "*.log" --older-than "30d"`
+  - Example: `drclean -g "*.log" --older-than "30d"`
   - Supports time units: s (seconds), m (minutes), h (hours), d (days), w (weeks)
   - Checks file modification time against threshold
   - Skips files newer than specified duration
@@ -142,7 +142,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Helps identify permission issues and locked files
 
 - **Exclude Patterns Feature**: New `--exclude` (`-e`) flag to skip files matching specific patterns
-  - Example: `rclean -g "*.log" --exclude "important.log"`
+  - Example: `drclean -g "*.log" --exclude "important.log"`
   - Supports multiple exclude patterns
   - Works with config file via `exclude_patterns` field
 
@@ -220,7 +220,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Paths outside working directory are skipped with warnings
   - Protects against malicious patterns like `../../etc/passwd`
 
-- **Config File Safety**: Improved validation of `.rclean.toml` contents
+- **Config File Safety**: Improved validation of `.drclean.toml` contents
   - Better error messages for malformed configs
   - Pattern validation before execution
 
@@ -240,4 +240,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.1]
 
-- Added initial rclean code
+- Added initial drclean code

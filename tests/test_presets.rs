@@ -1,4 +1,4 @@
-use rclean::constants::{get_default_patterns, get_preset_patterns, PRESET_NAMES};
+use drclean::constants::{get_default_patterns, get_preset_patterns, PRESET_NAMES};
 
 #[test]
 fn test_all_preset_names_resolve() {

@@ -13,5 +13,5 @@ clean:
 	@rm -rf target
 
 install: build
-	@cp target/release/rclean /usr/local/bin/
-	@echo "rclean installed"
+	@cp target/release/drclean /usr/local/bin/
+	@echo "drclean installed"
