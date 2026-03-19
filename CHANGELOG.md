@@ -15,6 +15,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ---
 
+## [0.3.0]
+
+### Changed
+
+- **Renamed project from `rclean` to `drclean`** for crates.io publishing (the name `rclean` was already taken)
+  - Package name: `rclean` -> `drclean`
+  - Binary name: `rclean` -> `drclean`
+  - Config file: `.rclean.toml` -> `.drclean.toml`
+  - Global config directory: `~/.config/rclean/` -> `~/.config/drclean/`
+  - Library crate imports: `use rclean::` -> `use drclean::`
+
+- **Added doc comments to all public API items** for docs.rs documentation
+  - Crate-level module documentation with quick-start example
+  - `CleanError`, `CleanConfig`, `CleanConfigBuilder`, `CleaningJob`, `MatchedItem` structs and all public fields/methods
+
+### Added
+
+- **Published to crates.io**: `cargo install drclean` is now the primary installation method
+- **CHANGELOG.md** included in the published package
+
+---
+
 ## [0.2.2]
 
 ### Fixed

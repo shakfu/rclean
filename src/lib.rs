@@ -1,3 +1,25 @@
+//! Safe, pattern-based file and directory cleaner.
+//!
+//! `drclean` recursively removes files and directories matching glob patterns,
+//! with built-in safety measures including dry-run mode, confirmation prompts,
+//! path traversal protection, and symlink guards.
+//!
+//! # Quick start
+//!
+//! ```no_run
+//! use drclean::{CleanConfig, CleaningJob};
+//!
+//! let config = CleanConfig::builder()
+//!     .path(".")
+//!     .patterns(vec!["**/__pycache__".into(), "**/*.pyc".into()])
+//!     .dry_run(true)
+//!     .skip_confirmation(true)
+//!     .build();
+//!
+//! let mut job = CleaningJob::new(config);
+//! job.run().expect("cleaning failed");
+//! ```
+
 pub mod constants;
 
 use dialoguer::Confirm;
@@ -16,13 +38,18 @@ use walkdir::WalkDir;
 // --------------------------------------------------------------------
 // error types
 
-/// Custom error type for cleaning operations
+/// Error type for cleaning operations.
 #[derive(Debug)]
 pub enum CleanError {
+    /// An I/O error occurred during file operations.
     IoError(std::io::Error),
+    /// A glob pattern failed to compile.
     GlobError(globset::Error),
+    /// A path resolved outside the allowed working directory.
     PathTraversal(PathBuf),
+    /// Insufficient permissions to access or remove a path.
     PermissionDenied(PathBuf),
+    /// A configuration or validation error.
     ConfigError(String),
 }
 
@@ -52,6 +79,7 @@ impl From<globset::Error> for CleanError {
     }
 }
 
+/// Convenience alias for `std::result::Result<T, CleanError>`.
 pub type Result<T> = std::result::Result<T, CleanError>;
 
 // --------------------------------------------------------------------
@@ -150,23 +178,36 @@ pub fn discover_config(start_dir: &Path) -> Option<PathBuf> {
 // --------------------------------------------------------------------
 // configuration
 
-/// Serializable configuration for a cleaning job
+/// Serializable configuration for a cleaning job.
+///
+/// Construct via [`CleanConfig::builder()`] or deserialize from a `.drclean.toml` file.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CleanConfig {
+    /// Root directory to clean (default `"."`).
     pub path: String,
+    /// Glob patterns to match for deletion.
     pub patterns: Vec<String>,
+    /// Glob patterns to exclude from deletion.
     #[serde(default)]
     pub exclude_patterns: Vec<String>,
+    /// When `true`, report matches without deleting anything.
     pub dry_run: bool,
+    /// When `true`, skip the interactive confirmation prompt.
     pub skip_confirmation: bool,
+    /// When `true`, matched symlinks are eligible for removal.
     pub include_symlinks: bool,
+    /// When `true`, broken symlinks are removed regardless of pattern matching.
     pub remove_broken_symlinks: bool,
+    /// When `true`, display per-pattern match counts and sizes.
     #[serde(default)]
     pub stats_mode: bool,
+    /// If set, only remove files whose last modification is older than this many seconds.
     #[serde(default)]
     pub older_than_secs: Option<u64>,
+    /// When `true`, show a progress spinner during scanning.
     #[serde(default)]
     pub show_progress: bool,
+    /// When `true`, produce JSON output instead of human-readable text. CLI-only, not serialized.
     #[serde(skip)]
     pub json_mode: bool,
 }
@@ -196,68 +237,82 @@ impl CleanConfig {
     }
 }
 
-/// Builder for constructing CleanConfig with a fluent API
+/// Builder for constructing [`CleanConfig`] with a fluent API.
+///
+/// Obtained via [`CleanConfig::builder()`].
 #[derive(Default)]
 pub struct CleanConfigBuilder {
     config: CleanConfig,
 }
 
 impl CleanConfigBuilder {
+    /// Set the root directory to clean.
     pub fn path(mut self, path: impl Into<String>) -> Self {
         self.config.path = path.into();
         self
     }
 
+    /// Set the glob patterns to match for deletion.
     pub fn patterns(mut self, patterns: Vec<String>) -> Self {
         self.config.patterns = patterns;
         self
     }
 
+    /// Set glob patterns to exclude from deletion.
     pub fn exclude_patterns(mut self, patterns: Vec<String>) -> Self {
         self.config.exclude_patterns = patterns;
         self
     }
 
+    /// Enable or disable dry-run mode.
     pub fn dry_run(mut self, dry_run: bool) -> Self {
         self.config.dry_run = dry_run;
         self
     }
 
+    /// Enable or disable skipping the confirmation prompt.
     pub fn skip_confirmation(mut self, skip: bool) -> Self {
         self.config.skip_confirmation = skip;
         self
     }
 
+    /// Enable or disable removal of matched symlinks.
     pub fn include_symlinks(mut self, include: bool) -> Self {
         self.config.include_symlinks = include;
         self
     }
 
+    /// Enable or disable removal of broken symlinks.
     pub fn remove_broken_symlinks(mut self, remove: bool) -> Self {
         self.config.remove_broken_symlinks = remove;
         self
     }
 
+    /// Enable or disable per-pattern statistics.
     pub fn stats_mode(mut self, stats: bool) -> Self {
         self.config.stats_mode = stats;
         self
     }
 
+    /// Set the minimum age (in seconds) for files to be eligible for removal.
     pub fn older_than_secs(mut self, secs: Option<u64>) -> Self {
         self.config.older_than_secs = secs;
         self
     }
 
+    /// Enable or disable the progress spinner during scanning.
     pub fn show_progress(mut self, progress: bool) -> Self {
         self.config.show_progress = progress;
         self
     }
 
+    /// Enable or disable JSON output mode.
     pub fn json_mode(mut self, json: bool) -> Self {
         self.config.json_mode = json;
         self
     }
 
+    /// Consume the builder and return the finished [`CleanConfig`].
     pub fn build(self) -> CleanConfig {
         self.config
     }
@@ -269,22 +324,34 @@ impl CleanConfigBuilder {
 /// Pre-compiled pattern matchers for statistics attribution
 type PatternMatchers = Vec<(String, GlobMatcher)>;
 
-/// A matched item for structured output
+/// A single matched item, used in JSON output.
 #[derive(Serialize, Debug)]
 pub struct MatchedItem {
+    /// Display path of the matched file or directory.
     pub path: String,
+    /// Size in bytes.
     pub size: u64,
+    /// The glob pattern that matched this item.
     pub pattern: String,
 }
 
-/// Runtime executor for cleaning jobs
+/// Runtime executor for cleaning jobs.
+///
+/// Holds a [`CleanConfig`] plus transient state accumulated during a run
+/// (matched targets, statistics, failures).
 pub struct CleaningJob {
+    /// The configuration driving this job.
     pub config: CleanConfig,
     targets: Vec<(PathBuf, Metadata)>,
+    /// Cumulative size in bytes of all matched items.
     pub size: u64,
+    /// Number of matched items.
     pub counter: usize,
+    /// Per-pattern statistics: pattern -> (count, total bytes).
     pub stats: HashMap<String, (usize, u64)>,
+    /// Paths that could not be deleted, with error messages.
     pub failed_deletions: Vec<(PathBuf, String)>,
+    /// Matched items collected for JSON output.
     pub matched_items: Vec<MatchedItem>,
 }
 

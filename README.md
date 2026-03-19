@@ -17,7 +17,10 @@ A fast, safe Rust command-line utility for recursively removing files and direct
 ## Installation
 
 ```sh
-# Build and install to /usr/local/bin
+# Install from crates.io
+cargo install drclean
+
+# Or build and install to /usr/local/bin
 make install
 
 # Or build release binary
@@ -232,8 +235,8 @@ cargo build --release
 
 ## Testing
 
-Comprehensive test suite with 54 tests:
-- 12 integration tests (dry-run, deletion, directories, patterns, symlinks, security, age filtering)
+Comprehensive test suite with 55 tests:
+- 13 integration tests (dry-run, deletion, directories, patterns, symlinks, security, age filtering)
 - 10 duration parsing tests (all units, edge cases)
 - 9 preset resolution tests (all presets, deduplication, unknown handling)
 - 9 glob matching and TOML serialization tests
