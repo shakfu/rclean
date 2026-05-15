@@ -9,10 +9,10 @@ use std::io;
 use std::path::Path;
 use std::process;
 
-use drclean::constants::{
+use rclean::constants::{
     get_default_patterns, get_preset_patterns, PRESET_NAMES, SETTINGS_FILENAME,
 };
-use drclean::{discover_config, parse_duration, CleanConfig, CleaningJob, Result};
+use rclean::{discover_config, parse_duration, CleanConfig, CleaningJob, Result};
 
 // --------------------------------------------------------------------
 // cli api
@@ -33,11 +33,11 @@ struct Args {
     #[arg(short, long)]
     exclude: Option<Vec<String>>,
 
-    /// Configure from config file (searches upward then ~/.config/drclean/ if no path given)
+    /// Configure from config file (searches upward then ~/.config/rclean/ if no path given)
     #[arg(short, long, value_name = "PATH", num_args = 0..=1, default_missing_value = "")]
     configfile: Option<String>,
 
-    /// Write default '.drclean.toml' file
+    /// Write default '.rclean.toml' file
     #[arg(short, long)]
     write_configfile: bool,
 
@@ -119,10 +119,10 @@ fn init_logging(level: simplelog::LevelFilter) {
     .expect("could not initialize logging");
 }
 
-/// Generate default config file: '.drclean.toml'
+/// Generate default config file: '.rclean.toml'
 fn write_configfile(config: &CleanConfig) -> Result<()> {
     let toml = toml::to_string(config).map_err(|e| {
-        drclean::CleanError::ConfigError(format!("Failed to serialize config: {}", e))
+        rclean::CleanError::ConfigError(format!("Failed to serialize config: {}", e))
     })?;
 
     let cfg_out = Path::new(SETTINGS_FILENAME);
@@ -131,21 +131,21 @@ fn write_configfile(config: &CleanConfig) -> Result<()> {
         fs::write(cfg_out, toml)?;
         Ok(())
     } else {
-        Err(drclean::CleanError::ConfigError(format!(
+        Err(rclean::CleanError::ConfigError(format!(
             "Cannot overwrite existing '{SETTINGS_FILENAME}' file"
         )))
     }
 }
 
 /// Load config from file, then apply CLI overrides.
-/// If no explicit path is given, searches upward for `.drclean.toml`
-/// then falls back to `~/.config/drclean/config.toml`.
+/// If no explicit path is given, searches upward for `.rclean.toml`
+/// then falls back to `~/.config/rclean/config.toml`.
 fn run_job_from_configfile(config_path: Option<String>, args: &Args) -> Result<()> {
     let resolved_path = if let Some(ref explicit) = config_path.filter(|s| !s.is_empty()) {
         // Explicit path provided -- use it directly
         let p = Path::new(explicit);
         if !p.exists() {
-            return Err(drclean::CleanError::ConfigError(format!(
+            return Err(rclean::CleanError::ConfigError(format!(
                 "Settings file '{}' not found",
                 explicit
             )));
@@ -154,11 +154,11 @@ fn run_job_from_configfile(config_path: Option<String>, args: &Args) -> Result<(
     } else {
         // No explicit path -- discover config
         let cwd = std::env::current_dir().map_err(|e| {
-            drclean::CleanError::ConfigError(format!("Cannot get current directory: {}", e))
+            rclean::CleanError::ConfigError(format!("Cannot get current directory: {}", e))
         })?;
         discover_config(&cwd).ok_or_else(|| {
-            drclean::CleanError::ConfigError(format!(
-                "No '{}' found in directory tree or global config (~/.config/drclean/config.toml)",
+            rclean::CleanError::ConfigError(format!(
+                "No '{}' found in directory tree or global config (~/.config/rclean/config.toml)",
                 SETTINGS_FILENAME
             ))
         })?
@@ -169,7 +169,7 @@ fn run_job_from_configfile(config_path: Option<String>, args: &Args) -> Result<(
     info!("using settings file: {config_file:?}");
     let contents = fs::read_to_string(config_file)?;
     let mut config: CleanConfig = toml::from_str(&contents).map_err(|e| {
-        drclean::CleanError::ConfigError(format!("Cannot deserialize from .toml: {}", e))
+        rclean::CleanError::ConfigError(format!("Cannot deserialize from .toml: {}", e))
     })?;
 
     // CLI flags override config file values when explicitly set
@@ -202,7 +202,7 @@ fn run_job_from_configfile(config_path: Option<String>, args: &Args) -> Result<(
     job.run()?;
 
     if job.has_failures() {
-        return Err(drclean::CleanError::ConfigError(format!(
+        return Err(rclean::CleanError::ConfigError(format!(
             "{} deletion(s) failed",
             job.failed_deletions.len()
         )));
@@ -216,7 +216,7 @@ fn run(args: Args) -> Result<()> {
     // Generate shell completions and exit
     if let Some(shell) = args.completions {
         let mut cmd = Args::command();
-        generate(shell, &mut cmd, "drclean", &mut io::stdout());
+        generate(shell, &mut cmd, "rclean", &mut io::stdout());
         return Ok(());
     }
 
@@ -230,7 +230,7 @@ fn run(args: Args) -> Result<()> {
                 if let Some(patterns) = get_preset_patterns(name) {
                     info!("{} preset patterns: {:?}", name, patterns);
                 } else {
-                    return Err(drclean::CleanError::ConfigError(format!(
+                    return Err(rclean::CleanError::ConfigError(format!(
                         "Unknown preset '{}'. Available: {}",
                         name,
                         PRESET_NAMES.join(", ")
@@ -259,7 +259,7 @@ fn run(args: Args) -> Result<()> {
                 match get_preset_patterns(name) {
                     Some(p) => combined.extend(p),
                     None => {
-                        return Err(drclean::CleanError::ConfigError(format!(
+                        return Err(rclean::CleanError::ConfigError(format!(
                             "Unknown preset '{}'. Available: {}",
                             name,
                             PRESET_NAMES.join(", ")
@@ -275,7 +275,7 @@ fn run(args: Args) -> Result<()> {
             match get_preset_patterns(name) {
                 Some(p) => combined.extend(p),
                 None => {
-                    return Err(drclean::CleanError::ConfigError(format!(
+                    return Err(rclean::CleanError::ConfigError(format!(
                         "Unknown preset '{}'. Available: {}",
                         name,
                         PRESET_NAMES.join(", ")
@@ -312,13 +312,13 @@ fn run(args: Args) -> Result<()> {
 
     if json_mode {
         let json = job.to_json().map_err(|e| {
-            drclean::CleanError::ConfigError(format!("Failed to serialize JSON: {}", e))
+            rclean::CleanError::ConfigError(format!("Failed to serialize JSON: {}", e))
         })?;
         println!("{}", json);
     }
 
     if job.has_failures() {
-        return Err(drclean::CleanError::ConfigError(format!(
+        return Err(rclean::CleanError::ConfigError(format!(
             "{} deletion(s) failed",
             job.failed_deletions.len()
         )));

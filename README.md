@@ -1,4 +1,4 @@
-# drclean
+# rclean
 
 A fast, safe Rust command-line utility for recursively removing files and directories matching glob patterns. Designed for cleaning development artifacts with multiple safety measures and performance optimizations.
 
@@ -9,7 +9,7 @@ A fast, safe Rust command-line utility for recursively removing files and direct
 - **Safety First**: Path traversal protection, symlink guards, confirmation prompts, and dry-run mode
 - **Performance**: Metadata caching, pre-compiled glob matchers, and optimized traversal
 - **Statistics**: Optional breakdown of deletions by pattern with size reporting
-- **Configuration**: `.drclean.toml` with automatic discovery (upward search + global fallback)
+- **Configuration**: `.rclean.toml` with automatic discovery (upward search + global fallback)
 - **JSON Output**: Machine-readable output for scripting and automation
 - **Shell Completions**: Generated completions for bash, zsh, fish, elvish, powershell
 - **Error Handling**: Graceful error recovery with clear diagnostics; non-zero exit on failures
@@ -18,7 +18,7 @@ A fast, safe Rust command-line utility for recursively removing files and direct
 
 ```sh
 # Install from crates.io
-cargo install drclean
+cargo install rclean
 
 # Or build and install to /usr/local/bin
 make install
@@ -30,18 +30,18 @@ cargo build --release
 ## Usage
 
 ```sh
-% drclean --help
+% rclean --help
 Safely remove files and directories matching a set of glob patterns.
 
-Usage: drclean [OPTIONS]
+Usage: rclean [OPTIONS]
 
 Options:
   -p, --path <PATH>               Working directory [default: .]
   -g, --glob <GLOB>               Include glob pattern(s) (can specify multiple)
   -e, --exclude <EXCLUDE>         Exclude glob pattern(s) (can specify multiple)
       --preset <PRESET>           Use a named preset (common, python, node, rust, java, c, go, all)
-  -c, --configfile [PATH]         Load config (searches upward, then ~/.config/drclean/)
-  -w, --write-configfile          Write default '.drclean.toml' file
+  -c, --configfile [PATH]         Load config (searches upward, then ~/.config/rclean/)
+  -w, --write-configfile          Write default '.rclean.toml' file
   -d, --dry-run                   Preview deletions without removing
   -y, --skip-confirmation         Skip confirmation prompt
   -s, --stats                     Display statistics by pattern
@@ -62,54 +62,54 @@ Options:
 
 ```bash
 # Preview what would be deleted (dry-run)
-drclean -d
+rclean -d
 
 # Remove with default patterns (requires confirmation)
-drclean
+rclean
 
 # Custom patterns with multiple includes
-drclean -g "*.log" -g "**/*.tmp"
+rclean -g "*.log" -g "**/*.tmp"
 
 # Exclude specific patterns
-drclean -g "*.cache" -e "**/important.cache"
+rclean -g "*.cache" -e "**/important.cache"
 
 # Use presets for specific ecosystems
-drclean --preset node
-drclean --preset rust
-drclean --preset python --preset common
+rclean --preset node
+rclean --preset rust
+rclean --preset python --preset common
 
 # Combine presets with custom patterns
-drclean --preset python -g "**/*.log"
+rclean --preset python -g "**/*.log"
 
 # List available presets and their patterns
-drclean -l --preset python
+rclean -l --preset python
 
 # Show statistics breakdown
-drclean -s
+rclean -s
 
 # Only remove files older than 30 days
-drclean -o 30d
+rclean -o 30d
 
 # Remove broken symlinks
-drclean -b
+rclean -b
 
 # Skip confirmation (use with caution)
-drclean -y
+rclean -y
 
-# Use config file (auto-discovers .drclean.toml upward or ~/.config/drclean/)
-drclean -c
+# Use config file (auto-discovers .rclean.toml upward or ~/.config/rclean/)
+rclean -c
 
 # Use config file with CLI overrides
-drclean -c --dry-run --stats
+rclean -c --dry-run --stats
 
 # Use explicit config file path
-drclean -c configs/my-cleanup.toml
+rclean -c configs/my-cleanup.toml
 
 # JSON output for scripting
-drclean -d --format json | jq '.summary'
+rclean -d --format json | jq '.summary'
 
 # Quiet mode for scripting
-drclean -y -q
+rclean -y -q
 ```
 
 ## Presets
@@ -129,20 +129,20 @@ Named pattern groups for common ecosystems. Use `--preset` to select one or more
 
 Default patterns (no `--preset` or `--glob`): `common` + `python` combined.
 
-View any preset's patterns with `drclean -l --preset <name>`.
+View any preset's patterns with `rclean -l --preset <name>`.
 
 ## Configuration
 
 ### Config File
 
-Create a `.drclean.toml` file to persist your settings:
+Create a `.rclean.toml` file to persist your settings:
 
 ```bash
 # Generate default config
-drclean -w
+rclean -w
 ```
 
-Example `.drclean.toml`:
+Example `.rclean.toml`:
 
 ```toml
 path = "."
@@ -164,14 +164,14 @@ stats_mode = true
 
 ### Config Discovery
 
-When you run `drclean -c` (without a path), the tool searches for configuration in this order:
+When you run `rclean -c` (without a path), the tool searches for configuration in this order:
 
-1. `.drclean.toml` in the current directory, then each parent directory upward
-2. `~/.config/drclean/config.toml` (global config)
+1. `.rclean.toml` in the current directory, then each parent directory upward
+2. `~/.config/rclean/config.toml` (global config)
 
-You can also specify an explicit path: `drclean -c path/to/config.toml`.
+You can also specify an explicit path: `rclean -c path/to/config.toml`.
 
-CLI flags always override config file values (e.g., `drclean -c --dry-run` forces dry-run even if the config says `dry_run = false`).
+CLI flags always override config file values (e.g., `rclean -c --dry-run` forces dry-run even if the config says `dry_run = false`).
 
 ### Shell Completions
 
@@ -179,13 +179,13 @@ Generate shell completions for your shell:
 
 ```bash
 # Bash
-drclean --completions bash > ~/.bash_completions/drclean
+rclean --completions bash > ~/.bash_completions/rclean
 
 # Zsh
-drclean --completions zsh > ~/.zfunc/_drclean
+rclean --completions zsh > ~/.zfunc/_rclean
 
 # Fish
-drclean --completions fish > ~/.config/fish/completions/drclean.fish
+rclean --completions fish > ~/.config/fish/completions/rclean.fish
 ```
 
 ### JSON Output
@@ -193,7 +193,7 @@ drclean --completions fish > ~/.config/fish/completions/drclean.fish
 Use `--format json` for machine-readable output:
 
 ```bash
-drclean -d --format json | jq '.summary'
+rclean -d --format json | jq '.summary'
 ```
 
 The JSON output includes four sections:

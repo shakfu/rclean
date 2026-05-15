@@ -27,12 +27,12 @@ clean:
 	@rm -rf target
 
 install: build
-	@cp target/release/drclean /usr/local/bin/
-	@echo "drclean installed"
+	@cp target/release/rclean /usr/local/bin/
+	@echo "rclean installed"
 
 uninstall:
-	@rm -f /usr/local/bin/drclean
-	@echo "drclean uninstalled"
+	@rm -f /usr/local/bin/rclean
+	@echo "rclean uninstalled"
 
 publish-dry:
 	@cargo publish --dry-run

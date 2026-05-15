@@ -1,4 +1,4 @@
-use drclean::{CleanConfig, CleaningJob};
+use rclean::{CleanConfig, CleaningJob};
 use std::fs;
 use tempfile::TempDir;
 

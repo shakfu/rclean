@@ -1,4 +1,4 @@
-use drclean::parse_duration;
+use rclean::parse_duration;
 
 #[test]
 fn test_parse_duration_seconds() {

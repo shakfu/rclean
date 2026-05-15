@@ -1,7 +1,7 @@
 // --------------------------------------------------------------------
 // constants
 
-pub const SETTINGS_FILENAME: &str = ".drclean.toml";
+pub const SETTINGS_FILENAME: &str = ".rclean.toml";
 
 /// Available preset names
 pub const PRESET_NAMES: &[&str] = &["common", "python", "node", "rust", "java", "c", "go", "all"];
@@ -16,7 +16,7 @@ pub fn get_preset_patterns(name: &str) -> Option<Vec<String>> {
             "**/Thumbs.db",
             "**/*.swp",
             "**/*.swo",
-            "**/*~",
+            // "**/*~",
         ],
         "python" => vec![
             "**/__pycache__",
@@ -32,8 +32,8 @@ pub fn get_preset_patterns(name: &str) -> Option<Vec<String>> {
             "**/pip-log.txt",
             "**/*.pyc",
             "**/*.pyo",
-            "**/*.egg-info",
-            "**/dist",
+            // "**/*.egg-info",
+            // "**/dist",
         ],
         "node" => vec![
             "**/node_modules",

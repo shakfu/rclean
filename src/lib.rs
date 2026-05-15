@@ -1,13 +1,13 @@
 //! Safe, pattern-based file and directory cleaner.
 //!
-//! `drclean` recursively removes files and directories matching glob patterns,
+//! `rclean` recursively removes files and directories matching glob patterns,
 //! with built-in safety measures including dry-run mode, confirmation prompts,
 //! path traversal protection, and symlink guards.
 //!
 //! # Quick start
 //!
 //! ```no_run
-//! use drclean::{CleanConfig, CleaningJob};
+//! use rclean::{CleanConfig, CleaningJob};
 //!
 //! let config = CleanConfig::builder()
 //!     .path(".")
@@ -164,14 +164,14 @@ pub fn find_config_upward(start_dir: &Path, filename: &str) -> Option<PathBuf> {
 }
 
 /// Return the path to the global config file, if it exists.
-/// Checks `~/.config/drclean/config.toml`.
+/// Checks `~/.config/rclean/config.toml`.
 pub fn global_config_path() -> Option<PathBuf> {
     dirs::config_dir()
-        .map(|d| d.join("drclean").join("config.toml"))
+        .map(|d| d.join("rclean").join("config.toml"))
         .filter(|p| p.is_file())
 }
 
-/// Discover a config file: first search upward for `.drclean.toml`, then fall back to global.
+/// Discover a config file: first search upward for `.rclean.toml`, then fall back to global.
 pub fn discover_config(start_dir: &Path) -> Option<PathBuf> {
     find_config_upward(start_dir, constants::SETTINGS_FILENAME).or_else(global_config_path)
 }
@@ -181,7 +181,7 @@ pub fn discover_config(start_dir: &Path) -> Option<PathBuf> {
 
 /// Serializable configuration for a cleaning job.
 ///
-/// Construct via [`CleanConfig::builder()`] or deserialize from a `.drclean.toml` file.
+/// Construct via [`CleanConfig::builder()`] or deserialize from a `.rclean.toml` file.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CleanConfig {
     /// Root directory to clean (default `"."`).
