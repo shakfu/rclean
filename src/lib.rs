@@ -189,8 +189,9 @@ pub struct CleanConfig {
     pub path: String,
     /// Glob patterns to match for deletion.
     pub patterns: Vec<String>,
-    /// Glob patterns to exclude from deletion.
-    #[serde(default)]
+    /// Glob patterns to exclude. An excluded directory is not entered.
+    /// Defaults to [`constants::DEFAULT_EXCLUDES`]; an empty list excludes nothing.
+    #[serde(default = "constants::get_default_excludes")]
     pub exclude_patterns: Vec<String>,
     /// When `true`, report matches without deleting anything.
     pub dry_run: bool,
@@ -216,6 +217,10 @@ pub struct CleanConfig {
     /// [`constants::PROTECTED_DIRS`]; an empty list disables the protection.
     #[serde(default = "constants::get_protected_dirs")]
     pub protected_dirs: Vec<String>,
+    /// When `true`, match build output at the top level of a project as well.
+    /// See [`constants::BUILD_ARTIFACTS`].
+    #[serde(default)]
+    pub build_artifacts: bool,
 }
 
 impl Default for CleanConfig {
@@ -223,7 +228,7 @@ impl Default for CleanConfig {
         Self {
             path: ".".to_string(),
             patterns: vec![],
-            exclude_patterns: vec![],
+            exclude_patterns: constants::get_default_excludes(),
             dry_run: false,
             skip_confirmation: false,
             include_symlinks: false,
@@ -233,6 +238,7 @@ impl Default for CleanConfig {
             show_progress: false,
             json_mode: false,
             protected_dirs: constants::get_protected_dirs(),
+            build_artifacts: false,
         }
     }
 }
@@ -265,7 +271,7 @@ impl CleanConfigBuilder {
         self
     }
 
-    /// Set glob patterns to exclude from deletion.
+    /// Set glob patterns to exclude, replacing the defaults.
     pub fn exclude_patterns(mut self, patterns: Vec<String>) -> Self {
         self.config.exclude_patterns = patterns;
         self
@@ -323,6 +329,12 @@ impl CleanConfigBuilder {
     /// An empty list disables the protection.
     pub fn protected_dirs(mut self, dirs: Vec<String>) -> Self {
         self.config.protected_dirs = dirs;
+        self
+    }
+
+    /// Enable or disable matching of build output directories.
+    pub fn build_artifacts(mut self, enabled: bool) -> Self {
+        self.config.build_artifacts = enabled;
         self
     }
 
@@ -480,6 +492,36 @@ fn should_process(entry_path: &Path) -> bool {
     true
 }
 
+/// Whether `path` is build output at the top level of a project.
+///
+/// The directory name must be paired with a marker file in
+/// [`constants::BUILD_ARTIFACTS`], and both that marker and `.git` must sit in
+/// the parent directory. `.git` is what pins the match to the project root: a
+/// CMake subdirectory carries its own `CMakeLists.txt`, so the marker alone
+/// would claim `src/program/build` too.
+fn is_artifact_dir(path: &Path, name: &OsStr) -> bool {
+    // The name test is a few string compares; each marker test below is a stat.
+    if !constants::BUILD_ARTIFACTS
+        .iter()
+        .any(|(dir, _)| OsStr::new(dir) == name)
+    {
+        return false;
+    }
+
+    let Some(project) = path.parent() else {
+        return false;
+    };
+
+    // `.git` is a file in a submodule checkout, so any entry type counts
+    if !project.join(".git").exists() {
+        return false;
+    }
+
+    constants::BUILD_ARTIFACTS
+        .iter()
+        .any(|(dir, marker)| OsStr::new(dir) == name && project.join(marker).is_file())
+}
+
 /// Find which pattern matched the entry using pre-compiled matchers
 fn find_matching_pattern(matchers: &[(String, GlobMatcher)], entry_path: &Path) -> Option<String> {
     for (pattern, matcher) in matchers {
@@ -587,23 +629,33 @@ impl Scan<'_> {
         let is_dir = file_type.is_dir();
         let is_symlink = file_type.is_symlink();
 
+        // Excluded entries are neither matched nor entered. The check runs ahead of
+        // the include match so that excluding a directory prunes the walk: a
+        // virtualenv is skipped in one step rather than scanned and rejected file by
+        // file. The root is exempt, as pointing rclean at an excluded directory is
+        // deliberate.
+        if !is_root {
+            if let Some(ref exclude) = self.exclude_set {
+                if exclude.is_match(path) {
+                    self.note(format!("Excluded: {:?}", path.display()));
+                    return false;
+                }
+            }
+        }
+
         // Handle broken symlinks
         if self.config.remove_broken_symlinks && is_symlink && fs::metadata(path).is_err() {
             self.collect(path, "broken-symlink".to_string());
             return false;
         }
 
-        // Check if path matches include patterns
-        if !self.include_set.is_match(path) {
-            return is_dir;
-        }
+        // Check if path matches include patterns, or is build output when asked for
+        let artifact = self.config.build_artifacts
+            && is_dir
+            && name.is_some_and(|n| is_artifact_dir(path, n));
 
-        // Check if path matches exclude patterns
-        if let Some(ref exclude) = self.exclude_set {
-            if exclude.is_match(path) {
-                self.note(format!("Excluded: {:?}", path.display()));
-                return is_dir;
-            }
+        if !artifact && !self.include_set.is_match(path) {
+            return is_dir;
         }
 
         // Skip symlinks unless explicitly included
@@ -614,7 +666,9 @@ impl Scan<'_> {
         // Only stats and JSON output name the matching pattern, so the second
         // matcher pass is skipped when neither is on.
         let pattern = if self.config.stats_mode || self.config.json_mode {
-            find_matching_pattern(self.matchers, path).unwrap_or_else(|| "unknown".to_string())
+            find_matching_pattern(self.matchers, path).unwrap_or_else(|| {
+                if artifact { "build-artifact" } else { "unknown" }.to_string()
+            })
         } else {
             String::new()
         };

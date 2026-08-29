@@ -20,6 +20,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **`-B` / `--build-artifacts` removes build output.** The default patterns cannot express it: `build`, `dist` and `target` are ordinary directory names, and a glob for them would claim a source directory called `build` as readily as a CMake output tree. A directory is matched only when its name is paired with a marker file (`target` with `Cargo.toml` or `pom.xml`, `build` with `CMakeLists.txt`, `package.json`, `pyproject.toml`, ...) and both that marker and `.git` sit beside it. Requiring `.git` pins the match to the top level of a project, where a marker alone would not: a CMake subdirectory carries its own `CMakeLists.txt`, so `src/program/build` would qualify too. 25 pairs across C/C++, Rust, JavaScript, JVM, Python, Zig, Swift, Elixir and Dart; `--list` prints the directory names. Ported from cclean.
+
+### Changed
+
+- **`.venv` and `venv` moved from protected directories to default excludes.** Protection is for data whose loss is unrecoverable; a virtualenv is rebuilt from a lockfile, so it does not belong on a list users cannot override per run. It stays off the walk by default because scanning one is slow and matches thousands of items nobody wants. `exclude_patterns` now defaults to `["**/.venv", "**/venv"]`, and the protected list is `.git`, `.hg`, `.svn`, `.config`, `.ssh` and `.gnupg`. To clean a virtualenv: name it on `--path`, pass `--no-protect`, or set `exclude_patterns` in a config file.
+
+- **An excluded directory is no longer entered.** The exclude check ran after the include match, so excluding a directory only stopped it from being deleted -- the walk still descended and reported every match inside as excluded, one line per item. Excludes are now checked first and prune the walk. A pattern aimed at files (`**/keep.pyc`) is unaffected; one aimed at a directory (`**/build`) now also spares its contents.
+
+---
+
 ## [0.4.0]
 
 ### Fixed

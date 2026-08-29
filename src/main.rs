@@ -10,7 +10,8 @@ use std::path::Path;
 use std::process;
 
 use rclean::constants::{
-    get_default_patterns, get_preset_patterns, get_protected_dirs, PRESET_NAMES, SETTINGS_FILENAME,
+    get_artifact_dirs, get_default_excludes, get_default_patterns, get_preset_patterns,
+    get_protected_dirs, DEFAULT_EXCLUDES, PRESET_NAMES, SETTINGS_FILENAME,
 };
 use rclean::{discover_config, parse_duration, CleanConfig, CleaningJob, Result};
 
@@ -57,6 +58,10 @@ struct Args {
     #[arg(short, long)]
     remove_broken_symlinks: bool,
 
+    /// Also match build output at the top level of a project (build, target, dist, ...)
+    #[arg(short = 'B', long)]
+    build_artifacts: bool,
+
     /// Display statistics by pattern
     #[arg(short = 's', long)]
     stats: bool,
@@ -69,7 +74,7 @@ struct Args {
     #[arg(short = 'P', long)]
     progress: bool,
 
-    /// Match inside protected directories (.git, .ssh, .venv, ...)
+    /// Match inside protected (.git, .ssh, ...) and excluded-by-default (.venv) directories
     #[arg(long)]
     no_protect: bool,
 
@@ -195,8 +200,16 @@ fn run_job_from_configfile(config_path: Option<String>, args: &Args) -> Result<(
     if args.progress {
         config.show_progress = true;
     }
+    if args.build_artifacts {
+        config.build_artifacts = true;
+    }
     if args.no_protect {
         config.protected_dirs.clear();
+        // Only the built-in excludes go: patterns the config file names are the
+        // user's own, and this flag is about the defaults.
+        config
+            .exclude_patterns
+            .retain(|p| !DEFAULT_EXCLUDES.contains(&p.as_str()));
     }
     if let Some(ref excludes) = args.exclude {
         config.exclude_patterns.extend(excludes.clone());
@@ -248,6 +261,8 @@ fn run(args: Args) -> Result<()> {
             info!("default patterns: {:?}", get_default_patterns());
             info!("available presets: {}", PRESET_NAMES.join(", "));
             info!("protected directories: {:?}", get_protected_dirs());
+            info!("default excludes: {:?}", get_default_excludes());
+            info!("build artifact directories: {:?}", get_artifact_dirs());
         }
         return Ok(());
     }
@@ -296,10 +311,18 @@ fn run(args: Args) -> Result<()> {
         get_default_patterns()
     };
 
+    // The defaults carry `--exclude` unless the run opts out of them entirely
+    let mut exclude_patterns = if args.no_protect {
+        Vec::new()
+    } else {
+        get_default_excludes()
+    };
+    exclude_patterns.extend(args.exclude.unwrap_or_default());
+
     let config = CleanConfig::builder()
         .path(args.path)
         .patterns(patterns)
-        .exclude_patterns(args.exclude.unwrap_or_default())
+        .exclude_patterns(exclude_patterns)
         .dry_run(args.dry_run)
         .skip_confirmation(args.skip_confirmation)
         .include_symlinks(args.include_symlinks)
@@ -308,6 +331,7 @@ fn run(args: Args) -> Result<()> {
         .older_than_secs(older_than_secs)
         .show_progress(args.progress)
         .json_mode(args.format == OutputFormat::Json)
+        .build_artifacts(args.build_artifacts)
         .protected_dirs(if args.no_protect {
             Vec::new()
         } else {

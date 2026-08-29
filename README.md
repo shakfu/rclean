@@ -8,6 +8,8 @@ A fast, safe Rust command-line utility for recursively removing files and direct
 
 - **Presets**: Named pattern groups for Python, Node.js, Rust, Java, C, Go, and more
 
+- **Build artifacts**: Optional removal of build output, matched by project layout rather than by name
+
 - **Safety First**: Path traversal protection, symlink guards, confirmation prompts, and dry-run mode
 
 - **Performance**: Metadata caching, pre-compiled glob matchers, and optimized traversal
@@ -56,13 +58,14 @@ Options:
   -o, --older-than <DURATION>     Only remove files older than duration (e.g., "30d", "7d", "24h")
   -P, --progress                  Show progress bar during scanning
   -i, --include-symlinks          Include matched symlinks for removal
-  -b, --remove-broken-symlinks    Remove broken symlinks
+  -r, --remove-broken-symlinks    Remove broken symlinks
+  -B, --build-artifacts           Also match build output at the top level of a project
   -v, --verbose                   Increase verbosity (debug-level logging)
   -q, --quiet                     Suppress all output except errors
   -l, --list                      List default glob patterns
       --completions <SHELL>       Generate shell completions (bash, zsh, fish, elvish, powershell)
       --format <FORMAT>           Output format: text (default) or json
-      --no-protect                Match inside protected directories (.git, .ssh, .venv, ...)
+      --no-protect                Match inside protected (.git, .ssh, ...) and excluded-by-default (.venv) directories
   -h, --help                      Print help
   -V, --version                   Print version
 ```
@@ -78,6 +81,9 @@ rclean
 
 # Custom patterns with multiple includes
 rclean -g "*.log" -g "**/*.tmp"
+
+# Also remove build output: ./target beside Cargo.toml, ./build beside CMakeLists.txt
+rclean -d -B
 
 # Exclude specific patterns
 rclean -g "*.cache" -e "**/important.cache"
@@ -160,7 +166,10 @@ patterns = [
     "**/*.pyc",
     "**/.DS_Store"
 ]
+# Optional. Omit to keep the built-in list; set to [] to exclude nothing.
 exclude_patterns = [
+    "**/.venv",
+    "**/venv",
     "**/important/**",
     "**/keep.pyc"
 ]
@@ -169,9 +178,10 @@ skip_confirmation = false
 include_symlinks = false
 remove_broken_symlinks = false
 stats_mode = true
+build_artifacts = false
 
 # Optional. Omit to keep the built-in list; set to [] to disable protection.
-protected_dirs = [".git", ".hg", ".svn", ".venv", "venv", ".config", ".ssh", ".gnupg"]
+protected_dirs = [".git", ".hg", ".svn", ".config", ".ssh", ".gnupg"]
 ```
 
 ### Config Discovery
@@ -219,6 +229,37 @@ The JSON output includes four sections:
 
 - `failures` - Array of failed deletions with path and error message
 
+## Build Artifacts
+
+`-B` / `--build-artifacts` matches build output in addition to the glob patterns. Build output is found by project layout, not by name: a directory qualifies when its name is paired with a marker file below, and both that marker and `.git` sit beside it.
+
+| Directory | Marker |
+|-|-|
+| `build` | `CMakeLists.txt`, `meson.build`, `package.json`, `build.gradle`, `build.gradle.kts`, `pyproject.toml`, `setup.py`, `pubspec.yaml` |
+| `dist` | `package.json`, `pyproject.toml`, `setup.py` |
+| `target` | `Cargo.toml`, `pom.xml` |
+| `.next`, `.nuxt`, `.svelte-kit`, `.turbo`, `.parcel-cache` | `package.json` |
+| `.gradle` | `build.gradle`, `build.gradle.kts` |
+| `zig-out`, `zig-cache`, `.zig-cache` | `build.zig` |
+| `.build` | `Package.swift` |
+| `_build` | `mix.exs` |
+
+`build` and `target` are ordinary names, so both conditions are required. The `.git` test pins the match to the top level of a project:
+
+```
+project/
+  .git                     -> marks the project root
+  CMakeLists.txt           -> marks a CMake project
+  build/                   -> matched
+  src/program/
+    CMakeLists.txt         -> a subdirectory carries its own
+    build/                 -> not matched: no .git beside it
+```
+
+A matched directory is one deletion target and is not entered, so its contents are neither walked nor counted. Protected directories and excludes are applied first: build output inside `.venv` stays.
+
+Matches are attributed to the pattern `build-artifact` in `--stats` and `--format json`.
+
 ## Safety Measures
 
 ### Protected directories
@@ -226,16 +267,34 @@ The JSON output includes four sections:
 These directory names are never matched and never entered:
 
 ```
-.git  .hg  .svn  .venv  venv  .config  .ssh  .gnupg
+.git  .hg  .svn  .config  .ssh  .gnupg
 ```
 
-They hold data whose loss is expensive and unrecoverable, and their contents also match ordinary cleaning patterns: a git object store holds files named like build artifacts, and a virtualenv holds `__pycache__` directories by the hundred. Protection is by name and covers any entry type, so the `.git` *file* that marks a submodule is protected too.
+They hold data whose loss is expensive and unrecoverable, and their contents also match ordinary cleaning patterns: a git object store holds files named like build artifacts. Protection is by name and covers any entry type, so the `.git` *file* that marks a submodule is protected too.
 
 Two deliberate exceptions:
 
 - A directory named on `--path` is entered. Pointing rclean at `.git` is a deliberate act, and silently doing nothing there would be its own trap.
 
 - `--no-protect` disables the list for one run. In a config file, `protected_dirs` replaces it outright, so a project can protect names of its own.
+
+### Default excludes
+
+These patterns are excluded from every run, and an excluded directory is not entered:
+
+```
+**/.venv  **/venv
+```
+
+A virtualenv is rebuilt from a lockfile, so scanning one costs time for matches nobody wants: an installed environment holds `__pycache__` directories by the hundred.
+
+This is an ordinary exclude, not protection. Three ways to clean a virtualenv anyway:
+
+- Name it on `--path`, which exempts the root as protection does.
+
+- Pass `--no-protect`, which drops the built-in excludes along with the protected names. Excludes named in a config file or on `--exclude` are kept.
+
+- Set `exclude_patterns` in a config file, which replaces the defaults outright.
 
 ### Other measures
 

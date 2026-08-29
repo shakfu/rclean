@@ -8,15 +8,15 @@ fn create_protected_structure() -> TempDir {
     let temp_dir = TempDir::new().unwrap();
     let base = temp_dir.path();
 
-    for dir in [".git/objects", ".venv/lib", ".ssh", "src"] {
+    for dir in [".git/objects", ".config/lib", ".ssh", "src"] {
         fs::create_dir_all(base.join(dir)).unwrap();
         fs::write(base.join(dir).join("cached.pyc"), "payload").unwrap();
     }
 
-    // A __pycache__ inside a virtualenv, of the kind an install leaves behind
-    let venv_cache = base.join(".venv").join("lib").join("__pycache__");
-    fs::create_dir_all(&venv_cache).unwrap();
-    fs::write(venv_cache.join("mod.pyc"), "payload").unwrap();
+    // A __pycache__ nested below a protected directory, not just at its root
+    let config_cache = base.join(".config").join("lib").join("__pycache__");
+    fs::create_dir_all(&config_cache).unwrap();
+    fs::write(config_cache.join("mod.pyc"), "payload").unwrap();
 
     let src_cache = base.join("src").join("__pycache__");
     fs::create_dir(&src_cache).unwrap();
@@ -42,8 +42,8 @@ fn test_protected_dirs_are_not_entered() {
     assert_eq!(job.counter, 2);
 
     assert!(base.join(".git/objects/cached.pyc").exists());
-    assert!(base.join(".venv/lib/cached.pyc").exists());
-    assert!(base.join(".venv/lib/__pycache__").exists());
+    assert!(base.join(".config/lib/cached.pyc").exists());
+    assert!(base.join(".config/lib/__pycache__").exists());
     assert!(base.join(".ssh/cached.pyc").exists());
 
     assert!(!base.join("src/cached.pyc").exists());
@@ -112,7 +112,7 @@ fn test_protection_can_be_disabled() {
     let mut job = CleaningJob::new(config);
     job.run().unwrap();
 
-    // .git, .venv (twice), .ssh, src (twice) -- the six the comparison reported
+    // .git, .config (twice), .ssh, src (twice) -- the six the comparison reported
     assert_eq!(job.counter, 6);
 }
 
@@ -176,3 +176,4 @@ remove_broken_symlinks = false
     let config: CleanConfig = toml::from_str(toml).unwrap();
     assert_eq!(config.protected_dirs, PROTECTED_DIRS);
 }
+
