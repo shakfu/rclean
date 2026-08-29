@@ -21,12 +21,13 @@ pub fn get_protected_dirs() -> Vec<String> {
 
 /// Glob patterns excluded from the walk by default.
 ///
-/// A virtualenv is rebuilt from a lockfile, so its contents are not worth the
+/// A virtualenv is rebuilt from a lockfile, so its contents may not be worth the
 /// scan: an installed environment holds `__pycache__` directories by the
 /// hundred, all of which the default patterns match. This is an ordinary
 /// exclude, not protection: `--no-protect` drops it, `exclude_patterns` in a
 /// config file replaces it, and naming a virtualenv on `--path` cleans it.
-pub const DEFAULT_EXCLUDES: &[&str] = &["**/.venv", "**/venv"];
+// pub const DEFAULT_EXCLUDES: &[&str] = &["**/.venv", "**/venv"];
+pub const DEFAULT_EXCLUDES: &[&str] = &[];
 
 /// The default exclude patterns, owned.
 pub fn get_default_excludes() -> Vec<String> {

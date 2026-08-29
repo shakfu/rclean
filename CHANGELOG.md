@@ -22,6 +22,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.4.2]
+
+## Changes
+
+- Note that `.venv` and `venv` are not include in `DEFAULT_EXCLUDES` by default to be consistent with prior behaviour.
+
 ## [0.4.1]
 
 ### Added
@@ -30,7 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Changed
 
-- **`.venv` and `venv` moved from protected directories to default excludes.** Protection is for data whose loss is unrecoverable; a virtualenv is rebuilt from a lockfile, so it does not belong on a list users cannot override per run. It stays off the walk by default because scanning one is slow and matches thousands of items nobody wants. `exclude_patterns` now defaults to `["**/.venv", "**/venv"]`, and the protected list is `.git`, `.hg`, `.svn`, `.config`, `.ssh` and `.gnupg`. To clean a virtualenv: name it on `--path`, pass `--no-protect`, or set `exclude_patterns` in a config file.
+- **`.venv` and `venv` moved from protected directories to (optional) default excludes.** Protection is for data whose loss is unrecoverable; a virtualenv is rebuilt from a lockfile, so it does not belong on a list users cannot override per run. If included in `DEFAULT_EXCLUDES`, it stays off the walk by default because scanning one is slow and matches thousands of items nobody wants. `exclude_patterns` now defaults to `["**/.venv", "**/venv"]`, and the protected list is `.git`, `.hg`, `.svn`, `.config`, `.ssh` and `.gnupg`. To clean a virtualenv: name it on `--path`, pass `--no-protect`, or set `exclude_patterns` in a config file.
 
 - **An excluded directory is no longer entered.** The exclude check ran after the include match, so excluding a directory only stopped it from being deleted -- the walk still descended and reported every match inside as excluded, one line per item. Excludes are now checked first and prune the walk. A pattern aimed at files (`**/keep.pyc`) is unaffected; one aimed at a directory (`**/build`) now also spares its contents.
 
