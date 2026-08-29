@@ -350,3 +350,139 @@ fn test_no_failures_when_dir_and_children_both_match() {
     // No failures -- child files should be skipped, not produce ENOENT errors
     assert!(!job.has_failures());
 }
+
+#[test]
+fn test_matched_directory_counted_once() {
+    let temp_dir = TempDir::new().unwrap();
+    let base = temp_dir.path();
+
+    let cache = base.join("__pycache__");
+    fs::create_dir(&cache).unwrap();
+    fs::write(cache.join("a.pyc"), vec![b'x'; 100]).unwrap();
+    fs::write(cache.join("b.pyc"), vec![b'x'; 200]).unwrap();
+
+    let base_path = base.to_str().unwrap().to_string();
+
+    // Both patterns match: the directory, and the files it holds
+    let config = CleanConfig::builder()
+        .path(base_path)
+        .patterns(vec!["**/__pycache__".to_string(), "**/*.pyc".to_string()])
+        .dry_run(true)
+        .skip_confirmation(true)
+        .build();
+    let mut job = CleaningJob::new(config);
+    job.run().unwrap();
+
+    // The directory is claimed whole, so its contents are not counted again
+    assert_eq!(job.counter, 1);
+    assert_eq!(job.size, 300);
+}
+
+#[test]
+fn test_dry_run_does_not_prompt() {
+    let temp_dir = create_test_structure();
+    let base_path = temp_dir.path().to_str().unwrap().to_string();
+
+    // No skip_confirmation: a dry run must still complete, since the test harness
+    // has no terminal on stdin and prompting there fails
+    let config = CleanConfig::builder()
+        .path(base_path)
+        .patterns(vec!["**/*.pyc".to_string()])
+        .dry_run(true)
+        .build();
+    let mut job = CleaningJob::new(config);
+
+    job.run().unwrap();
+    assert_eq!(job.counter, 4);
+    assert!(temp_dir.path().join("test.pyc").exists());
+}
+
+#[test]
+fn test_directory_size_includes_nested_contents() {
+    let temp_dir = TempDir::new().unwrap();
+    let base = temp_dir.path();
+
+    let cache = base.join("__pycache__");
+    fs::create_dir_all(cache.join("a").join("b")).unwrap();
+    fs::write(cache.join("top.bin"), vec![b'x'; 10]).unwrap();
+    fs::write(cache.join("a").join("mid.bin"), vec![b'x'; 20]).unwrap();
+    fs::write(cache.join("a").join("b").join("deep.bin"), vec![b'x'; 30]).unwrap();
+
+    let base_path = base.to_str().unwrap().to_string();
+
+    let config = CleanConfig::builder()
+        .path(base_path)
+        .patterns(vec!["**/__pycache__".to_string()])
+        .dry_run(true)
+        .skip_confirmation(true)
+        .build();
+    let mut job = CleaningJob::new(config);
+    job.run().unwrap();
+
+    assert_eq!(job.counter, 1);
+    assert_eq!(job.size, 60);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_directory_size_does_not_follow_symlinks() {
+    let temp_dir = TempDir::new().unwrap();
+    let base = temp_dir.path();
+
+    let outside = base.join("outside");
+    fs::create_dir(&outside).unwrap();
+    let big = outside.join("big.bin");
+    fs::write(&big, vec![b'x'; 100_000]).unwrap();
+
+    let cache = base.join("__pycache__");
+    fs::create_dir(&cache).unwrap();
+    std::os::unix::fs::symlink(&big, cache.join("link.bin")).unwrap();
+
+    let base_path = base.to_str().unwrap().to_string();
+
+    let config = CleanConfig::builder()
+        .path(base_path)
+        .patterns(vec!["**/__pycache__".to_string()])
+        .dry_run(true)
+        .skip_confirmation(true)
+        .build();
+    let mut job = CleaningJob::new(config);
+    job.run().unwrap();
+
+    // The link is counted at its own size; removing the directory never touches
+    // the file it points at
+    assert_eq!(job.counter, 1);
+    assert!(
+        job.size < 100_000,
+        "symlink target was counted: {}",
+        job.size
+    );
+    assert!(big.exists());
+}
+
+#[test]
+fn test_nested_matching_directories_counted_once() {
+    let temp_dir = TempDir::new().unwrap();
+    let base = temp_dir.path();
+
+    let outer = base.join("node_modules");
+    let inner = outer.join("pkg").join("node_modules");
+    fs::create_dir_all(&inner).unwrap();
+    fs::write(inner.join("f.bin"), vec![b'x'; 50]).unwrap();
+
+    let base_path = base.to_str().unwrap().to_string();
+
+    let config = CleanConfig::builder()
+        .path(base_path)
+        .patterns(vec!["**/node_modules".to_string()])
+        .skip_confirmation(true)
+        .build();
+    let mut job = CleaningJob::new(config);
+    job.run().unwrap();
+
+    // Only the outer directory is a target; the inner one goes with it
+    assert_eq!(job.counter, 1);
+    assert_eq!(job.size, 50);
+    assert!(!outer.exists());
+    assert!(!job.has_failures());
+}

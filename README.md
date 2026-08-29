@@ -5,13 +5,21 @@ A fast, safe Rust command-line utility for recursively removing files and direct
 ## Features
 
 - **Pattern Matching**: Include and exclude glob patterns with full wildcard support
+
 - **Presets**: Named pattern groups for Python, Node.js, Rust, Java, C, Go, and more
+
 - **Safety First**: Path traversal protection, symlink guards, confirmation prompts, and dry-run mode
+
 - **Performance**: Metadata caching, pre-compiled glob matchers, and optimized traversal
+
 - **Statistics**: Optional breakdown of deletions by pattern with size reporting
+
 - **Configuration**: `.rclean.toml` with automatic discovery (upward search + global fallback)
+
 - **JSON Output**: Machine-readable output for scripting and automation
+
 - **Shell Completions**: Generated completions for bash, zsh, fish, elvish, powershell
+
 - **Error Handling**: Graceful error recovery with clear diagnostics; non-zero exit on failures
 
 ## Installation
@@ -54,6 +62,7 @@ Options:
   -l, --list                      List default glob patterns
       --completions <SHELL>       Generate shell completions (bash, zsh, fish, elvish, powershell)
       --format <FORMAT>           Output format: text (default) or json
+      --no-protect                Match inside protected directories (.git, .ssh, .venv, ...)
   -h, --help                      Print help
   -V, --version                   Print version
 ```
@@ -160,6 +169,9 @@ skip_confirmation = false
 include_symlinks = false
 remove_broken_symlinks = false
 stats_mode = true
+
+# Optional. Omit to keep the built-in list; set to [] to disable protection.
+protected_dirs = [".git", ".hg", ".svn", ".venv", "venv", ".config", ".ssh", ".gnupg"]
 ```
 
 ### Config Discovery
@@ -167,6 +179,7 @@ stats_mode = true
 When you run `rclean -c` (without a path), the tool searches for configuration in this order:
 
 1. `.rclean.toml` in the current directory, then each parent directory upward
+
 2. `~/.config/rclean/config.toml` (global config)
 
 You can also specify an explicit path: `rclean -c path/to/config.toml`.
@@ -199,20 +212,49 @@ rclean -d --format json | jq '.summary'
 The JSON output includes four sections:
 
 - `matches` - Array of matched items with path, size, and pattern
+
 - `summary` - Total count, size (bytes and human-readable), dry-run flag
+
 - `stats` - Per-pattern breakdown (count, size) when `--stats` is enabled
+
 - `failures` - Array of failed deletions with path and error message
 
 ## Safety Measures
 
+### Protected directories
+
+These directory names are never matched and never entered:
+
+```
+.git  .hg  .svn  .venv  venv  .config  .ssh  .gnupg
+```
+
+They hold data whose loss is expensive and unrecoverable, and their contents also match ordinary cleaning patterns: a git object store holds files named like build artifacts, and a virtualenv holds `__pycache__` directories by the hundred. Protection is by name and covers any entry type, so the `.git` *file* that marks a submodule is protected too.
+
+Two deliberate exceptions:
+
+- A directory named on `--path` is entered. Pointing rclean at `.git` is a deliberate act, and silently doing nothing there would be its own trap.
+
+- `--no-protect` disables the list for one run. In a config file, `protected_dirs` replaces it outright, so a project can protect names of its own.
+
+### Other measures
+
 - Safe defaults with curated pattern list
+
 - Dry-run mode to preview deletions (`-d`)
+
 - Confirmation prompts (skippable with `-y`)
+
 - Path traversal protection via canonicalization
+
   - All paths validated to be within the working directory
+
   - Protects against malicious patterns like `../../etc/passwd`
+
 - Paths starting with `..` are automatically skipped
+
 - Symlinks only removed with explicit `--include-symlinks` flag
+
 - Broken symlinks only removed with `--remove-broken-symlinks` flag
 
 ## Development
@@ -235,13 +277,23 @@ cargo build --release
 
 ## Testing
 
-Comprehensive test suite with 55 tests:
-- 13 integration tests (dry-run, deletion, directories, patterns, symlinks, security, age filtering)
+Comprehensive test suite with 69 tests:
+- 18 integration tests (dry-run, deletion, directories, patterns, symlinks, security, age filtering, directory sizing)
+
+- 7 protected directory tests (traversal, opt-out, configurability, root exemption)
+
+- 1 relative-path traversal test
+
 - 10 duration parsing tests (all units, edge cases)
+
 - 9 preset resolution tests (all presets, deduplication, unknown handling)
+
 - 9 glob matching and TOML serialization tests
+
 - 7 config discovery tests (upward search, global fallback, edge cases)
+
 - 5 size formatting tests (B through TiB)
+
 - 2 JSON output structure tests
 
 All tests use `tempfile` for safe temporary directory creation.

@@ -10,7 +10,7 @@ use std::path::Path;
 use std::process;
 
 use rclean::constants::{
-    get_default_patterns, get_preset_patterns, PRESET_NAMES, SETTINGS_FILENAME,
+    get_default_patterns, get_preset_patterns, get_protected_dirs, PRESET_NAMES, SETTINGS_FILENAME,
 };
 use rclean::{discover_config, parse_duration, CleanConfig, CleaningJob, Result};
 
@@ -69,6 +69,10 @@ struct Args {
     #[arg(short = 'P', long)]
     progress: bool,
 
+    /// Match inside protected directories (.git, .ssh, .venv, ...)
+    #[arg(long)]
+    no_protect: bool,
+
     /// Increase verbosity (debug-level logging)
     #[arg(short, long)]
     verbose: bool,
@@ -113,7 +117,7 @@ fn init_logging(level: simplelog::LevelFilter) {
     simplelog::TermLogger::init(
         level,
         logging_config,
-        simplelog::TerminalMode::Mixed,
+        simplelog::TerminalMode::Stderr,
         simplelog::ColorChoice::Auto,
     )
     .expect("could not initialize logging");
@@ -191,6 +195,9 @@ fn run_job_from_configfile(config_path: Option<String>, args: &Args) -> Result<(
     if args.progress {
         config.show_progress = true;
     }
+    if args.no_protect {
+        config.protected_dirs.clear();
+    }
     if let Some(ref excludes) = args.exclude {
         config.exclude_patterns.extend(excludes.clone());
     }
@@ -240,6 +247,7 @@ fn run(args: Args) -> Result<()> {
         } else {
             info!("default patterns: {:?}", get_default_patterns());
             info!("available presets: {}", PRESET_NAMES.join(", "));
+            info!("protected directories: {:?}", get_protected_dirs());
         }
         return Ok(());
     }
@@ -300,6 +308,11 @@ fn run(args: Args) -> Result<()> {
         .older_than_secs(older_than_secs)
         .show_progress(args.progress)
         .json_mode(args.format == OutputFormat::Json)
+        .protected_dirs(if args.no_protect {
+            Vec::new()
+        } else {
+            get_protected_dirs()
+        })
         .build();
 
     if args.write_configfile {

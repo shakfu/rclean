@@ -3,6 +3,23 @@
 
 pub const SETTINGS_FILENAME: &str = ".rclean.toml";
 
+/// Directories never matched and never entered.
+///
+/// These hold data whose loss is expensive and unrecoverable -- repository
+/// history, private keys, an installed virtualenv -- while their contents also
+/// match ordinary cleaning patterns: a git object store holds files named like
+/// build artifacts, and a virtualenv holds `__pycache__` directories by the
+/// hundred. Protection is by name and applies to any entry type, so the `.git`
+/// *file* that marks a submodule is covered too.
+pub const PROTECTED_DIRS: &[&str] = &[
+    ".git", ".hg", ".svn", ".venv", "venv", ".config", ".ssh", ".gnupg",
+];
+
+/// The default protected directory names, owned.
+pub fn get_protected_dirs() -> Vec<String> {
+    PROTECTED_DIRS.iter().map(|s| s.to_string()).collect()
+}
+
 /// Available preset names
 pub const PRESET_NAMES: &[&str] = &["common", "python", "node", "rust", "java", "c", "go", "all"];
 
