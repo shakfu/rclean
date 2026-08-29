@@ -22,6 +22,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.4.1]
+
 ### Added
 
 - **`-B` / `--build-artifacts` removes build output.** The default patterns cannot express it: `build`, `dist` and `target` are ordinary directory names, and a glob for them would claim a source directory called `build` as readily as a CMake output tree. A directory is matched only when its name is paired with a marker file (`target` with `Cargo.toml` or `pom.xml`, `build` with `CMakeLists.txt`, `package.json`, `pyproject.toml`, ...) and both that marker and `.git` sit beside it. Requiring `.git` pins the match to the top level of a project, where a marker alone would not: a CMake subdirectory carries its own `CMakeLists.txt`, so `src/program/build` would qualify too. 25 pairs across C/C++, Rust, JavaScript, JVM, Python, Zig, Swift, Elixir and Dart; `--list` prints the directory names. Ported from cclean.
