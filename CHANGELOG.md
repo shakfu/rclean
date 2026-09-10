@@ -56,7 +56,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 - **Log output goes to stderr.** Info-level lines were written to stdout ahead of the JSON document, so the pipeline documented in the README,
   `rclean -d --format json | jq '.summary'`, could not parse. Diagnostics on stderr
-  and data on stdout also keeps `-q` from being load-bearing.
+  and data on stdout also keeps `-q` from being structural.
 
 - **Test fixture `tests/.drclean.toml` renamed to `tests/.rclean.toml`**, the name `test_toml_load` and `test_toml_table_from_file` read. `cargo test` exited non-zero on a clean checkout.
 
